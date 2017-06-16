@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 from collections import namedtuple
 from os.path import join, exists
-from cv2 import rectangle, putText, getTextSize, FONT_HERSHEY_COMPLEX_SMALL
+from cv2 import rectangle, putText, resize, getTextSize, FONT_HERSHEY_COMPLEX_SMALL
 
 
 Point = namedtuple('Point',['x', 'y'])
@@ -137,6 +137,33 @@ def coco_boxes2xmin_ymin_xmax_ymax(img, box):
 
     return int(xmin), int(ymin), int(xmax), int(ymax)
 
+
+def resize_wo_scale_dist(img, shape):
+    """
+    resize image to a fixed size without scale distortion. Missing areas will be padded with zeros.
+    :param img: RGB image
+    :param shape: width, height
+    :return: img
+    """
+
+    W, H = shape
+    h,w,c = img.shape
+
+    mask = np.zeros((H,W,c), dtype=np.uint8)
+
+    if h<w:
+        scale = W / w
+        H = h * scale
+    else:
+        scale = H / h
+        W = w * scale
+
+    W, H = int(W),int(H)
+    img = resize(img, (W, H))
+
+    mask[:H, :W] = img
+
+    return mask, scale
 
 
 

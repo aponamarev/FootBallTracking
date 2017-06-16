@@ -20,7 +20,7 @@ class ObjectDetectionNet(NetTemplate):
 
 
 
-    def __init__(self, n_classes, batch_sz, imshape, training_mode_flag, dropout_keep_rate,
+    def __init__(self, n_classes, batch_sz, imshape,
                  anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
         """
         A skeleton of SqueezeDet Net.
@@ -63,7 +63,7 @@ class ObjectDetectionNet(NetTemplate):
         self.input_labels = None
         tf.add_to_collection("inputs", self.input_labels)
 
-        super().__init__(training_mode_flag=training_mode_flag, dropout_keep_rate=dropout_keep_rate)
+        super().__init__()
 
     def setup_inputs(self, img, bbox, deltas, mask, labels):
         self.input_img = img
@@ -85,6 +85,15 @@ class ObjectDetectionNet(NetTemplate):
         self._add_obj_detection()
         self._add_loss_graph()
         self._add_train_graph()
+
+    def preprocess_inputs(self, img, labels, bbox):
+        """
+        Transforms inputs into expected net format.
+        :param img: RGB img -> will be scaled to a fixed size
+        :param labels:
+        :param bbox: [[xmin, ymin, xmax, ymax]] where y=0 is the image bottom - will be scalled to a fixed size
+        :return: img, labels, mask, bbox_values, bbox_deltas
+        """
 
 
     def _add_featuremap(self):

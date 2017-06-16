@@ -1,17 +1,17 @@
 	# Author: Alexander Ponamarev (alex.ponamaryov@gmail.com) 04/30/2017
 import tensorflow as tf
-from tensorflow.contrib.layers import xavier_initializer
+from tensorflow.contrib.layers import xavier_initializer, batch_norm
 from tensorflow import concat
 import numpy as np
 
 class NetTemplate(object):
-    def __init__(self, training_mode_flag, dropout_keep_rate, default_activation='elu',
+    def __init__(self, default_activation='elu',
                  dtype=tf.float32):
         self.weights = []
         self.size = []
-        self.dropout_keep_rate = dropout_keep_rate
+        self.dropout_keep_rate = tf.placeholder(dtype=tf.float32, shape=[], name="dropout_keep_prob")
         tf.add_to_collection('inputs', self.dropout_keep_rate)
-        self.is_training_mode = training_mode_flag
+        self.is_training_mode = tf.placeholder(dtype=tf.bool, shape=[], name="is_training_phase")
         tf.add_to_collection('inputs', self.is_training_mode)
         self._default_activation = default_activation
         self._default_activation_summary = 'img'
@@ -131,7 +131,7 @@ class NetTemplate(object):
         return tf.nn.avg_pool(inputs, kernel, strides, padding=padding, name=name)
 
     def _batch_norm(self, input, name, trainable=False):
-        return tf.contrib.layers.batch_norm(input, trainable=trainable, is_training=self.is_training_mode)
+        return batch_norm(input, trainable=trainable, is_training=self.is_training_mode)
 
     def _drop_out_fullyconnected(self, input, name):
         return tf.nn.dropout(input, self.dropout_keep_rate, name=name)
