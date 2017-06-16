@@ -106,8 +106,8 @@ def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FON
 
         xmin, ymin, xmax, ymax = b
 
-        top_left = (xmin, Y-ymax)
-        bottom_right = (xmax, Y-ymin)
+        top_left = (int(xmin), int(Y-ymax))
+        bottom_right = (int(xmax), int(Y-ymin))
 
         rectangle(img, top_left, bottom_right,color, thickness=thickness)
         (w, h), baseline = getTextSize(l, fontFace, fontScale, max(1, int(thickness / 2)))
@@ -138,6 +138,39 @@ def coco_boxes2xmin_ymin_xmax_ymax(img, box):
     return int(xmin), int(ymin), int(xmax), int(ymax)
 
 
+def cxcywh_xmin_ymin_xmax_ymax(box):
+    """
+    Convert coordinates from cx, cy, w, h format into xmin ymin xmax ymax
+    :param box: cx, cy, w, h
+    :return: xmin ymin xmax ymax
+    """
+
+    x,y,w,h = box
+
+    xmin = x-w/2
+    xmax = x+w/2
+    ymin = y - h / 2
+    ymax = y + h / 2
+
+    return int(xmin), int(ymin), int(xmax), int(ymax)
+
+
+def coco_boxes2cxcywh(img, box):
+    """
+    Converts coco native format into xmin, ymin, xmax, ymax
+    :param img:
+    :param box: [x,y,width,height] top left x,y and width, height delta to get to bottom right
+    :return:
+    """
+    Y = img.shape[0]
+    xmin, ymax, w, h = box
+    ymax = Y-ymax
+    x = xmin + w/2
+    y = ymax - h/2
+
+    return int(x), int(y), int(w), int(h)
+
+
 def resize_wo_scale_dist(img, shape):
     """
     resize image to a fixed size without scale distortion. Missing areas will be padded with zeros.
@@ -164,6 +197,78 @@ def resize_wo_scale_dist(img, shape):
     mask[:H, :W] = img
 
     return mask, scale
+
+def find_anchor_ids(bboxes, anchors):
+    """
+    Identifies anchor ids_per_img responsible for object detection
+    :param bboxes:
+    :return: anchor ids_per_img
+    """
+    ids_per_img = []
+    id_iterator = set()
+    aid = len(anchors)
+    for box in bboxes:
+        overlaps = batch_iou(anchors, box)
+        for id in np.argsort(overlaps)[::-1]:
+            if overlaps[id] <= 0:
+                break
+            if id not in id_iterator:
+                id_iterator.add(id)
+                aid = id
+                break
+        ids_per_img.append(aid)
+    return ids_per_img
+
+
+def estimate_deltas(bboxes, anchor_ids, anchors):
+    """Calculates the deltas of ANCHOR_BOX and ground truth boxes.
+    :param bboxes: an array of ground trueth bounding boxes (bboxes) for an image [center_x, center_y,
+    width, height]
+    :param anchor_ids: ids per each ground truth box that have the highest IOU
+    :return: [anchor_center_x_delta,anchor_center_y_delta, log(anchor_width_scale), log(anchor_height_scale)]
+    """
+    assert len(bboxes)==len(anchor_ids),\
+        "Incorrect arrays provided for bboxes (len[{}]) and aids (len[{}]).".format(len(bboxes), len(anchor_ids)) +\
+        " Provided arrays should have the same length. "
+    delta_per_img = []
+    for box, aid in zip(bboxes, anchor_ids):
+        # calculate deltas
+        # unpack the box
+        box_cx, box_cy, box_w, box_h = box
+        # initialize a delta array [x,y,w,h]
+        if not(box_w > 0) or not(box_h > 0):
+            raise ValueError("Incorrect bbox size: height {}, width {}".format(box_h, box_w))
+        delta = [0] * 4
+        delta[0] = (box_cx - anchors[aid][0]) / box_w
+        delta[1] = (box_cy - anchors[aid][1]) / box_h
+        delta[2] = np.log(box_w / anchors[aid][2])
+        delta[3] = np.log(box_h / anchors[aid][3])
+        delta_per_img.append(delta)
+    return delta_per_img
+
+
+def batch_iou(boxes, box):
+    """Compute the Intersection-Over-Union of a batch of boxes with another
+    box.
+
+    Args:
+    box1: 2D array of [cx, cy, width, height].
+    box2: a single array of [cx, cy, width, height]
+    Returns:
+    ious: array of a float number in range [0, 1].
+    """
+    lr = np.maximum(np.minimum(boxes[:,0]+0.5*boxes[:,2], box[0]+0.5*box[2]) - \
+                    np.maximum(boxes[:,0]-0.5*boxes[:,2], box[0]-0.5*box[2]),
+                    0)
+
+    tb = np.maximum(
+        np.minimum(boxes[:,1]+0.5*boxes[:,3], box[1]+0.5*box[3]) - \
+        np.maximum(boxes[:,1]-0.5*boxes[:,3], box[1]-0.5*box[3]),
+        0)
+
+    inter = lr*tb
+    union = boxes[:,2]*boxes[:,3] + box[2]*box[3] - inter
+    return inter/union
 
 
 

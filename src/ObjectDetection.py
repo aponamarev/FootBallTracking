@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
     unstack, identity, stack, truediv, placeholder
-from .util import safe_exp, bbox_transform, set_anchors
+from .util import safe_exp, bbox_transform, set_anchors, resize_wo_scale_dist, find_anchor_ids, estimate_deltas
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
@@ -86,14 +86,26 @@ class ObjectDetectionNet(NetTemplate):
         self._add_loss_graph()
         self._add_train_graph()
 
-    def preprocess_inputs(self, img, labels, bbox):
+    def preprocess_inputs(self, img, labels, bboxes):
         """
         Transforms inputs into expected net format.
         :param img: RGB img -> will be scaled to a fixed size
         :param labels:
-        :param bbox: [[xmin, ymin, xmax, ymax]] where y=0 is the image bottom - will be scalled to a fixed size
+        :param bboxes: [[cx,cy,w,h]] where y=0 is the image bottom - will be scalled to a fixed size
         :return: img, labels, mask, bbox_values, bbox_deltas
         """
+
+        # 1. Rescale images to the same fixed size
+        im, scale = resize_wo_scale_dist(img, self.imshape)
+        bboxes = np.array(bboxes) * scale
+
+        # 2. Find mask (anchor ids)
+        aids = find_anchor_ids(bboxes, self.anchors)
+
+        # 3. Calculate deltas between anchors and bounding boxes
+        # TODO: convert bboxes into cx,cy,w,h format
+        deltas = estimate_deltas(bboxes, aids, self.anchors)
+
 
 
     def _add_featuremap(self):

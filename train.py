@@ -12,7 +12,8 @@ from tensorflow import placeholder
 import numpy as np
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet
-from src.util import draw_boxes, coco_boxes2xmin_ymin_xmax_ymax, resize_wo_scale_dist
+from src.util import draw_boxes, coco_boxes2xmin_ymin_xmax_ymax, \
+    coco_boxes2cxcywh, cxcywh_xmin_ymin_xmax_ymax, resize_wo_scale_dist
 
 CLASSES = ['person']
 ANNOTATIONS_FILE = 'src/coco/annotations/instances_train2014.json'
@@ -41,8 +42,10 @@ def main():
         im, scale = resize_wo_scale_dist(im, imshape)
         bboxes = np.array(bboxes)*scale
 
+        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
+        bboxes = list(map(cxcywh_xmin_ymin_xmax_ymax, bboxes))
 
-        draw_boxes(im, list(map(lambda x: coco_boxes2xmin_ymin_xmax_ymax(im, x),bboxes)), ['person']*len(labels))
+        draw_boxes(im, bboxes, ['person']*len(labels))
         imshow(im)
 
 if __name__=='__main__':
