@@ -54,7 +54,6 @@ def enqueue_thread(coord, sess, net, enqueue_op, inputs):
     with coord.stop_on_exception():
         while not coord.should_stop():
             data = generate_sample(net)
-            print(".", sep="", end=" ", flush=True)
             sess.run(enqueue_op, feed_dict={ph:v for ph,v in zip(inputs, data)})
 
 
