@@ -10,8 +10,9 @@ from collections import namedtuple
 import tensorflow as tf
 import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
-    unstack, identity, stack, truediv, placeholder
-from .util import safe_exp, bbox_transform, set_anchors, resize_wo_scale_dist, find_anchor_ids, estimate_deltas
+    unstack, identity, stack, truediv
+from .util import safe_exp, bbox_transform, set_anchors, resize_wo_scale_dist,\
+    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, convertToFixedSize, sparse_to_dense
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
@@ -20,12 +21,12 @@ class ObjectDetectionNet(NetTemplate):
 
 
 
-    def __init__(self, n_classes, batch_sz, imshape,
+    def __init__(self, labels_provided, batch_sz, imshape,
                  anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
         """
         A skeleton of SqueezeDet Net.
 
-        :param n_classes: number of classes
+        :param labels_provided: number of classes
         :param batch_sz: batch size
         :param gt_box: an input for ground true bounding boxes
         :param imshape: input image width(x) and height (y)
@@ -36,7 +37,8 @@ class ObjectDetectionNet(NetTemplate):
         self.featuremap = None
 
         self.imshape = Point(*imshape)
-        self.n_classes = n_classes
+        self.labels_available = labels_provided
+        self.n_classes = len(labels_provided)
         self.batch_sz = batch_sz
         self.K = len(anchor_shapes)
         self.WHK = self.K * self.imshape.x * self.imshape.y
@@ -47,21 +49,15 @@ class ObjectDetectionNet(NetTemplate):
         self.LOSS_COEF_CLASS = 1
         self.LOSS_COEF_CONF_POS = 75
         self.LOSS_COEF_CONF_NEG = 100
-        # TODO: Consider replacing an input for direct calculation
         self.input_img = None
-        tf.add_to_collection("inputs", self.input_img)
 
         self.input_box_values = None #[xmin, ymin, xmax, ymax]
-        tf.add_to_collection("inputs", self.input_box_values)
 
         self.input_box_delta = None
-        tf.add_to_collection("inputs", self.input_box_delta)
 
         self.input_mask = None
-        tf.add_to_collection("inputs", self.input_mask)
 
         self.input_labels = None
-        tf.add_to_collection("inputs", self.input_labels)
 
         super().__init__()
 
@@ -99,12 +95,52 @@ class ObjectDetectionNet(NetTemplate):
         im, scale = resize_wo_scale_dist(img, self.imshape)
         bboxes = np.array(bboxes) * scale
 
-        # 2. Find mask (anchor ids)
+        # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
+        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
+        labels = list(map(lambda x: self.labels_available.index(x), labels))
+
+        # 3. Find mask (anchor ids)
         aids = find_anchor_ids(bboxes, self.anchors)
 
-        # 3. Calculate deltas between anchors and bounding boxes
-        # TODO: convert bboxes into cx,cy,w,h format
+        # 4. Calculate deltas between anchors and bounding boxes
         deltas = estimate_deltas(bboxes, aids, self.anchors)
+
+        # 5. Convert to dense annotations
+
+        dense = self._map_to_grid(labels, bboxes, aids, deltas)
+
+        return im, dense['dense_labels'], dense['masks'], dense['bbox_deltas'], dense['bbox_values']
+
+
+
+    def _map_to_grid(self, sparse_label, sparse_gtbox, sparse_aids, sparse_deltas):
+
+        # Convert into a flattened out list
+        label_indices, \
+        bbox_indices, \
+        box_delta_values, \
+        mask_indices, \
+        box_values = convertToFixedSize(aidx=sparse_aids,
+                                        labels=sparse_label,
+                                        boxes_deltas=sparse_deltas,
+                                        bboxes=sparse_gtbox)
+
+        # Extract variables to make it more readable
+        n_anchors = len(self.anchors)
+        n_classes = self.n_classes
+        n_labels = len(label_indices)
+
+        # Dense boxes
+        label_indices = sparse_to_dense(label_indices, [n_anchors, n_classes], np.ones(n_labels, dtype=np.float))
+        bbox_deltas = sparse_to_dense(bbox_indices, [n_anchors, 4], box_delta_values)
+        mask = np.reshape(sparse_to_dense(mask_indices, [n_anchors], np.ones(n_labels, dtype=np.float)),
+                          [n_anchors, 1])
+        box_values = sparse_to_dense(bbox_indices, [n_anchors, 4], box_values)
+
+        return {'dense_labels': label_indices,
+                'masks': mask,
+                'bbox_deltas': bbox_deltas,
+                'bbox_values': box_values}
 
 
 

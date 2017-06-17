@@ -15,9 +15,9 @@ from .ObjectDetection import ObjectDetectionNet
 
 class SmallNet(ObjectDetectionNet):
 
-    def __init__(self, n_classes, batch_sz, imshape):
+    def __init__(self, labels_provided, batch_sz, imshape):
 
-        super().__init__(n_classes, batch_sz, imshape)
+        super().__init__(labels_provided, batch_sz, imshape)
 
     def _add_featuremap(self):
 

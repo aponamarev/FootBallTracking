@@ -271,6 +271,66 @@ def batch_iou(boxes, box):
     return inter/union
 
 
+def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
+    """Convert a 2d arrays of inconsistent size (varies based on n of objests) into
+    a list of tuples or triples to keep the consistent dimensionality across all
+    images (invariant to the number of objects)"""
+
+    label_indices = []
+    bbox_indices = []
+    box_delta_values = []
+    mask_indices = []
+    box_values = []
+
+    # Initialize a tracker of unique [img_ids, anchor] tuples and counter of labels
+    aidx_set = set()
+    label_counter = 0
+    num_discarded_labels = 0
+
+    for lbl_num in range(len(labels)):
+        label_counter += 1
+        # To keep a track of added label/ANCHOR_BOX create a list of ANCHOR_BOX
+        # (for each image [i]) corresponding to objects
+        ojb_anchor_id = aidx[lbl_num]
+        obj_label = labels[lbl_num]
+        box_deltas = boxes_deltas[lbl_num]
+        box_xyhw = bboxes[lbl_num]
+        if (ojb_anchor_id) not in aidx_set:
+            aidx_set.add(ojb_anchor_id)
+            # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
+            label_indices.append([ojb_anchor_id, obj_label])
+            mask_indices.append([ojb_anchor_id])
+            # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
+            bbox_indices.extend([[ojb_anchor_id, xywh] for xywh in range(4)])
+            box_delta_values.extend(box_deltas)
+            box_values.extend(box_xyhw)
+        else:
+            num_discarded_labels += 1
+    return label_indices, bbox_indices, box_delta_values, mask_indices, box_values
+
+
+def sparse_to_dense(sp_indices, output_shape, values, default_value=0):
+    """Build a dense matrix from sparse representations.
+
+    Args:
+    sp_indices: A [0-2]-D array that contains the index to place values.
+    shape: shape of the dense matrix.
+    values: A {0,1}-D array where values corresponds to the index in each row of
+    sp_indices.
+    default_value: values to set for indices not specified in sp_indices.
+    Return:
+    A dense numpy N-D array with shape output_shape.
+    """
+
+    assert len(sp_indices) == len(values), \
+      'Length of sp_indices is not equal to length of values'
+
+    array = np.ones(output_shape) * default_value
+    for idx, value in zip(sp_indices, values):
+        array[tuple(idx)] = value
+    return array
+
+
 
 def assert_list(v):
     assert_type(v, list)

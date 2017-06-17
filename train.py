@@ -19,14 +19,14 @@ CLASSES = ['person']
 ANNOTATIONS_FILE = 'src/coco/annotations/instances_train2014.json'
 PATH2IMAGES = 'src/coco/images/train2014'
 
-n_classes=1
+coco_labels=[1]
 batch_sz=8
 imshape=(720, 640)
 
 
 
 coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
-net = SmallNet(n_classes, batch_sz, imshape)
+net = SmallNet(coco_labels, batch_sz, imshape)
 
 
 gpu_id = 0
@@ -38,6 +38,8 @@ def main():
 
     for i in range(20):
         im, labels, bboxes = coco.get_sample()
+
+        dense = net.preprocess_inputs(im, labels, bboxes)
 
         im, scale = resize_wo_scale_dist(im, imshape)
         bboxes = np.array(bboxes)*scale
