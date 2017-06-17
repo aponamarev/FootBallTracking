@@ -25,7 +25,7 @@ PATH2IMAGES = 'src/coco/images/train2014'
 train_dir = 'logs/t1'
 
 coco_labels=[1]
-batch_sz=8
+batch_sz=16
 queue_capacity = batch_sz * 12
 prefetching_threads = 2
 imshape=(768, 512)
