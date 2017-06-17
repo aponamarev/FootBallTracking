@@ -298,6 +298,7 @@ class ObjectDetectionNet(NetTemplate):
         W_pos = self.LOSS_COEF_CONF_POS # weight of confidence loss in positive examples
         W_neg = self.LOSS_COEF_CONF_NEG # weight of confidence loss in negative examples
         n_obj = reduce_sum(mask) # number of target objects in an image - used to normalize loss
+        tf.summary.scalar("num_objects", n_obj)
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
 
@@ -310,7 +311,9 @@ class ObjectDetectionNet(NetTemplate):
                     # cross-entropy: q * -log(p) + (1-q) * -log(1-p)
                     # add a small value into log to prevent blowing up
                     pos_CE = L * (-tf.log(self.P_class + self.EPSILON))
+                    tf.summary.scalar("positive_class_error", reduce_sum(pos_CE))
                     neg_CE = (1 - L) * (-tf.log(1 - self.P_class + self.EPSILON))
+                    tf.summary.scalar("negative_class_error", reduce_sum(neg_CE))
                     self.P_loss = truediv(reduce_sum((pos_CE + neg_CE) * mask * W_ce), n_obj,
                                              name='loss')
                     # add to a collection called losses to sum those losses later
