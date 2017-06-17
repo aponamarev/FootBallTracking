@@ -8,7 +8,9 @@ __email__ = "alex.ponamaryov@gmail.com"
 
 import numpy as np
 import tensorflow as tf
+from functools import reduce
 from collections import namedtuple
+
 from os.path import join, exists
 from cv2 import rectangle, putText, resize, getTextSize, FONT_HERSHEY_COMPLEX_SMALL
 
@@ -57,12 +59,17 @@ def set_anchors(input_shape, output_shape,
     W, H, K = output_shape.x, output_shape.y, len(anchor_shapes)
     Wi, Hi = input_shape
 
-    anchor_shapes = np.reshape([anchor_shapes] * W * H, (H, W, K, 2))
 
     center_x = np.arange(1, W + 1) * float(Wi) / W
+    center_y = np.arange(1, H + 1) * float(Hi) / H
+
+
+    anchor_shapes = np.reshape([anchor_shapes] * W * H, (H, W, K, 2))
+
+
     center_x = np.reshape(np.transpose(np.reshape(np.array([center_x] * H * K), (K, H, W)),
                                        (1, 2, 0)), (H, W, K, 1))
-    center_y = np.arange(1, H + 1) * float(Hi) / H
+
     center_y = np.reshape(
         np.transpose(np.reshape(np.array([center_y] * W * K), (K, W, H)),
                      (2, 1, 0)), (H, W, K, 1))
@@ -192,6 +199,7 @@ def resize_wo_scale_dist(img, shape):
         W = w * scale
 
     W, H = int(W),int(H)
+    W, H = min(W, mask.shape[1]), min(H, mask.shape[0])
     img = resize(img, (W, H))
 
     mask[:H, :W] = img
@@ -274,7 +282,15 @@ def batch_iou(boxes, box):
 def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
     """Convert a 2d arrays of inconsistent size (varies based on n of objests) into
     a list of tuples or triples to keep the consistent dimensionality across all
-    images (invariant to the number of objects)"""
+    images (invariant to the number of objects)
+
+    :returns
+    label_indices,
+    bbox_indices,
+    box_delta_values,
+    mask_indices,
+    box_values [cx, cy, width, height]
+    """
 
     label_indices = []
     bbox_indices = []
@@ -340,3 +356,65 @@ def assert_list(v):
 
 def assert_type(v, t):
     assert type(v) == t, "Error: {} provided while {} is expected.".format_map(type(v).__name__, t.__name__)
+
+
+def filter_prediction(boxes, probs, cls_idx, n_classes, NMS_THRESH, TOP_N_DETECTIONS=200, PROB_THRESH=0.8):
+    """Filter bounding box predictions with probability threshold and
+    non-maximum supression.
+
+    Args:
+      boxes: array of [cx, cy, w, h].
+      probs: array of probabilities
+      cls_idx: array of class indices
+    Returns:
+      final_boxes: array of filtered bounding boxes.
+      final_probs: array of filtered probabilities
+      final_cls_idx: array of filtered class indices
+    """
+
+    if TOP_N_DETECTIONS < len(probs) and TOP_N_DETECTIONS > 0:
+        order = probs.argsort()[:-TOP_N_DETECTIONS - 1:-1]
+        probs = probs[order]
+        boxes = boxes[order]
+        cls_idx = cls_idx[order]
+    else:
+        filtered_idx = np.nonzero(probs > PROB_THRESH)[0]
+        probs = probs[filtered_idx]
+        boxes = boxes[filtered_idx]
+        cls_idx = cls_idx[filtered_idx]
+
+    final_boxes = []
+    final_probs = []
+    final_cls_idx = []
+
+    for c in range(n_classes):
+        idx_per_class = [i for i in range(len(probs)) if cls_idx[i] == c]
+        keep = nms(boxes[idx_per_class], probs[idx_per_class], NMS_THRESH)
+        for i in range(len(keep)):
+            if keep[i]:
+                final_boxes.append(boxes[idx_per_class[i]])
+                final_probs.append(probs[idx_per_class[i]])
+                final_cls_idx.append(c)
+    return final_boxes, final_probs, final_cls_idx
+
+def nms(boxes, probs, threshold):
+    """Non-Maximum supression.
+    Args:
+    boxes: array of [cx, cy, w, h] (center format)
+    probs: array of probabilities
+    threshold: two boxes are considered overlapping if their IOU is largher than
+        this threshold
+    form: 'center' or 'diagonal'
+    Returns:
+    keep: array of True or False.
+    """
+
+    order = probs.argsort()[::-1]
+    keep = [True]*len(order)
+
+    for i in range(len(order)-1):
+        ovps = batch_iou(boxes[order[i+1:]], boxes[order[i]])
+    for j, ov in enumerate(ovps):
+        if ov > threshold:
+            keep[order[j+i+1]] = False
+    return keep

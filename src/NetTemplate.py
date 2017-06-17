@@ -81,18 +81,17 @@ class NetTemplate(object):
         return self._activation(conv)
 
 
-    def _deconv(self, inputs, shapes, strides=[1,2,2,1], padding="SAME", name="deconv", bias=True, dtype=None):
-        dtype = dtype or self._dtype
+    def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True):
 
-        conv = tf.layers.conv2d_transpose(inputs, shapes[3], [shapes[1], shapes[2]], strides[1,2], padding,
-                                          use_bias=bias,kernel_initializer=xavier_initializer, dtype=dtype)
+        conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding,
+                                          use_bias=bias, kernel_initializer=xavier_initializer(), name=name)
 
         return self._activation(conv)
 
 
     def _concat(self, *arg, axis=3, name='merge'):
 
-        return concat((arg), axis=axis, name=name)
+        return concat(*arg, axis=axis, name=name)
 
 
     def _fullyconnected(self, inputs, output_channels, name="fully_connected", bias=True, dtype=None):

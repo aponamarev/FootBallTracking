@@ -9,7 +9,7 @@ __email__ = "alex.ponamaryov@gmail.com"
 
 
 import tensorflow as tf
-from tensorflow import VariableScope, name_scope
+from tensorflow import name_scope, variable_scope
 
 from .ObjectDetection import ObjectDetectionNet
 
@@ -31,29 +31,33 @@ class SmallNet(ObjectDetectionNet):
 
         def upsampling(input, filters, name):
 
-            with name_scope('upsampling/' + name):
-                t1 = conv(inputs, [1, 3, 3, filters])
-                t1 = conv(t1, [1, 3, 3, filters])
-                t1 = conv(t1, [1, 3, 3, filters])
-                t1 = conv(t1, [1, 3, 3, filters])
-                t1 = maxpool(t1)
+            with variable_scope('upsampling/' + name):
+                shape = input.get_shape().as_list()
+                t1 = conv(input, [3, 3, shape[3], filters], name='t1/conv1')
+                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv2')
+                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv3')
+                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv4')
+                t1 = maxpool(t1, name='t1/maxpool', padding='SAME')
 
-                t2 = conv(inputs, [1, 3, 3, filters])
-                t2 = conv(t2, [1, 3, 3, filters])
-                t2 = maxpool(t2)
+                t2 = conv(input, [3, 3, shape[3], filters], name='t2/conv1')
+                t2 = conv(t2, [3, 3, filters, filters], name='t2/conv2')
+                t2 = maxpool(t2, name='t2/maxpool', padding='SAME')
 
-                t3 = maxpool(inputs)
+                t3 = conv(input, [1, 1, shape[3], filters], name='t3/conv1')
+                t3 = maxpool(t3, name='t3/maxpool', padding='SAME')
 
-                c = concat((t1, t2, t3))
-                c = conv(c, [1,1,1,filters])
+                c = concat([t1, t2, t3], axis=3)
+                c_shape = c.get_shape().as_list()
+                c = conv(c, [1,1,c_shape[3],filters], name="output")
 
             return c
 
         def downsampling(input, filters, name):
+            shape = input.get_shape().as_list()
 
-            with name_scope('downsampling/' + name):
-                d = deconv(input, [1,3,3,filters], padding='VALID')
-                d = conv(d, [1,3,3,filters])
+            with variable_scope('downsampling/' + name):
+                d = deconv(input, filters, [3,3], [2,2], padding='SAME')
+                d = conv(d, [3,3,filters,filters], name='output')
 
             return d
 
@@ -75,16 +79,18 @@ class SmallNet(ObjectDetectionNet):
 
         dw5 = downsampling(up6, 128, 'd5')
         dw5 = concat((dw5, up5))
-        dw4 = downsampling(up6, 64, 'd4')
+        dw4 = downsampling(up5, 64, 'd4')
         dw4 = concat((dw4, up4))
-        dw3 = downsampling(up6, 32, 'd3')
+        dw3 = downsampling(up4, 32, 'd3')
         dw3 = concat((dw3, up3))
-        dw2 = downsampling(up6, 16, 'd2')
+        dw2 = downsampling(up3, 32, 'd2')
         dw2 = concat((dw2, up2))
-        dw1 = downsampling(up6, 8, 'd1')
-        dw1 = concat((dw1, up1))
 
-        self.featuremap = conv(dw1, [1,3,3, self.K + 4 + 1 + self.n_classes])
+        dw2_shape = dw2.get_shape().as_list()
+
+        #self.featuremap = conv(dw0, [3,3,dw0_shape[3], self.K + 4 + 1 + self.n_classes])
+
+        self.featuremap = conv(dw2, [3, 3, dw2_shape[3], self.K*(self.n_classes + 4 + 1)])
 
 
 

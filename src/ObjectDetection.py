@@ -37,12 +37,13 @@ class ObjectDetectionNet(NetTemplate):
         self.featuremap = None
 
         self.imshape = Point(*imshape)
+        self.outshape = Point(int(imshape[0]/4), int(imshape[1]/4))
         self.labels_available = labels_provided
         self.n_classes = len(labels_provided)
         self.batch_sz = batch_sz
         self.K = len(anchor_shapes)
-        self.WHK = self.K * self.imshape.x * self.imshape.y
-        self.anchors = set_anchors(imshape, imshape, anchor_shapes)
+        self.WHK = self.K * self.outshape.x * self.outshape.y
+        self.anchors = set_anchors(imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
         self.LOSS_COEF_BBOX = 5
@@ -63,26 +64,26 @@ class ObjectDetectionNet(NetTemplate):
 
     def setup_inputs(self, img, bbox, deltas, mask, labels):
         self.input_img = img
-        tf.add_to_collection("inputs", self.input_img)
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_img)
 
         self.input_box_values = bbox  # [xmin, ymin, xmax, ymax]
-        tf.add_to_collection("inputs", self.input_box_values)
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_box_values)
 
         self.input_box_delta = deltas
-        tf.add_to_collection("inputs", self.input_box_delta)
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_box_delta)
 
         self.input_mask = mask
-        tf.add_to_collection("inputs", self.input_mask)
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_mask)
 
         self.input_labels = labels
-        tf.add_to_collection("inputs", self.input_labels)
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_labels)
 
         self._add_featuremap()
         self._add_obj_detection()
         self._add_loss_graph()
         self._add_train_graph()
 
-    def preprocess_inputs(self, img, labels, bboxes):
+    def preprocess_COCO(self, img, labels, bboxes):
         """
         Transforms inputs into expected net format.
         :param img: RGB img -> will be scaled to a fixed size
@@ -155,6 +156,8 @@ class ObjectDetectionNet(NetTemplate):
         n_classes = self.n_classes
         mask = self.input_mask
         b_sz = self.batch_sz
+        K = self.K
+        KC = self.K * self.n_classes
         WHK = self.WHK
 
         # Tensor representing the IOU between predicted bbox and gt bbox
@@ -169,7 +172,8 @@ class ObjectDetectionNet(NetTemplate):
                 
                 For each of the anchors, calculate class probability
                 """
-                class_logits = reshape(featuremap[:, :, :, :n_classes],
+
+                class_logits = reshape(featuremap[:, :, :, :KC],
                                             [-1, n_classes])
                 # Softmax calculates probability distribution over the last dimension (classes)
                 P_class = nn.softmax(class_logits)
@@ -180,8 +184,8 @@ class ObjectDetectionNet(NetTemplate):
                 Estimate a confidence whether an anchor overlaps with an object
                 """
                 # Extract anchor logits for each image (batch sz dimension)
-                n_anchors_slice = (n_classes + WHK)
-                anchor_confidence = reshape(featuremap[:, :, :, n_classes:n_anchors_slice],
+                n_anchors_slice = (KC + K)
+                anchor_confidence = reshape(featuremap[:, :, :, KC:n_anchors_slice],
                                             [b_sz, WHK])
                 # Estimate highest confidence
                 self.anchor_confidence = sigmoid(anchor_confidence, name="C")
@@ -213,18 +217,19 @@ class ObjectDetectionNet(NetTemplate):
                 This part makes sure that the predicted values do not extend beyond the images size
                 '''
                 xmin, ymin, xmax, ymax = bbox_transform([center_x, center_y, width, height])
-                xmin = tf.minimum(tf.maximum(0.0, xmin), imshape.x - 1, name="xmin")
-                xmax = tf.maximum(tf.minimum(imshape.x - 1, xmax), 0, name="xmax")
-                ymin = tf.minimum(tf.maximum(0.0, ymin), imshape.x - 1, name="xmin")
-                ymax = tf.maximum(tf.minimum(imshape.y - 1, ymax), 0, name="xmax")
+                xmin = tf.minimum(tf.maximum(0.0, xmin), np.float32(imshape.x - 1.0), name="xmin")
+                xmax = tf.maximum(tf.minimum(np.float32(imshape.x - 1.0), xmax), 0.0, name="xmax")
+                ymin = tf.minimum(tf.maximum(0.0, ymin), np.float32(imshape.x - 1.0), name="xmin")
+                ymax = tf.maximum(tf.minimum(np.float32(imshape.y - 1.0), ymax), 0.0, name="xmax")
 
                 det_box = stack(bbox_transform([xmin, ymin, xmax, ymax]))
-                self.detected_box = tf.transpose(det_box, (1, 2, 0), name="box_prediction")
+                self.det_boxes = tf.transpose(det_box, (1, 2, 0), name="box_prediction")
+                tf.add_to_collection("predictions", self.det_boxes)
 
 
             with variable_scope('IOU'):
 
-                box1 = bbox_transform(unstack(self.detected_box, axis=2))
+                box1 = bbox_transform(unstack(self.det_boxes, axis=2))
                 box2 = bbox_transform(unstack(self.input_box_values, axis=2))
 
                 with tf.variable_scope('intersection'):
@@ -246,8 +251,17 @@ class ObjectDetectionNet(NetTemplate):
                     union = w1 * h1 + w2 * h2 - intersection
 
                 self.IoU = self.IoU.assign(
-                    intersection/(union+self.EPSILON) * reshape(mask, [b_sz, self.K])
+                    intersection/(union+self.EPSILON) * reshape(mask, [b_sz, self.WHK])
                 )
+
+            with variable_scope('probability'):
+
+                probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [b_sz, WHK, 1], name='final_class_prob'))
+
+                self.det_probs = tf.reduce_max(probs, 2, name='score')
+                tf.add_to_collection("predictions", self.det_probs)
+                self.det_class = tf.argmax(probs, 2, name='class_idx')
+                tf.add_to_collection("predictions", self.det_class)
 
 
     def _add_loss_graph(self):
@@ -313,7 +327,7 @@ class ObjectDetectionNet(NetTemplate):
                             reduction_indices=[1]), name='confidence_loss')
 
                     tf.add_to_collection('losses', self.conf_loss)
-                    tf.summary.scalar('mean confidence', reduce_sum(self.anchor_confidence * mask) / n_obj)
+                    tf.summary.scalar('mean confidence', reduce_sum(self.anchor_confidence * reshape(mask,[self.batch_sz, WHK])) / n_obj)
 
                 with tf.variable_scope('BBox'):
                     self.bbox_loss = truediv(
