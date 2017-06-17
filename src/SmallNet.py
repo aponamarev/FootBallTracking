@@ -32,6 +32,7 @@ class SmallNet(ObjectDetectionNet):
         def upsampling(input, filters, name):
 
             with variable_scope('upsampling/' + name):
+                input = bn(input, name=name)
                 shape = input.get_shape().as_list()
                 t1 = conv(input, [3, 3, shape[3], filters], name='t1/conv1')
                 t1 = conv(t1, [3, 3, filters, filters], name='t1/conv2')
@@ -56,6 +57,7 @@ class SmallNet(ObjectDetectionNet):
             shape = input.get_shape().as_list()
 
             with variable_scope('downsampling/' + name):
+                input = bn(input, name=name)
                 d = deconv(input, filters, [3,3], [2,2], padding='SAME')
                 d = conv(d, [3,3,filters,filters], name='output')
 

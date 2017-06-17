@@ -35,11 +35,9 @@ summary_step = 20
 checkpoint_step = 1000
 max_steps = 10**6
 
-
-net = SmallNet(coco_labels, batch_sz, imshape)
 coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES) # TODO: Move to after the set up of inputs to speed up debugging
 
-def generate_sample():
+def generate_sample(net):
     looking = True
     while looking:
         try:
@@ -52,12 +50,21 @@ def generate_sample():
     return [im, bboxes, deltas, mask, labels]
 
 
+def enqueue_thread(coord, sess, net, enqueue_op, inputs):
+    with coord.stop_on_exception():
+        while not coord.should_stop():
+            data = generate_sample(net)
+            print(".", sep="", end=" ", flush=True)
+            sess.run(enqueue_op, feed_dict={ph:v for ph,v in zip(inputs, data)})
+
+
 
 def train():
 
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
+            net = SmallNet(coco_labels, batch_sz, imshape)
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
             labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
             mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
@@ -96,14 +103,8 @@ def train():
 
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
-    def enqueue_thread(coord):
-        with coord.stop_on_exception():
-            while not coord.should_stop():
-                data = generate_sample()
-                print(".", sep="", end=" ", flush=True)
-                sess.run(enqueue_op, feed_dict={ph:v for ph,v in zip(inputs, data)})
-
-    threads = [threading.Thread(target=enqueue_thread, args=(coord,)).start() for i in range(prefetching_threads)]
+    threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
+               for _ in range(prefetching_threads)]
 
     pass_tracker_start = time.time()
     pass_tracker_prior = pass_tracker_start
@@ -126,7 +127,7 @@ def train():
             ]
 
             _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
-                sess.run(op_list) # , feed_dict={net.dropout_keep_rate: 1.0}
+                sess.run(op_list, feed_dict={net.is_training_mode: False}) # , feed_dict={net.dropout_keep_rate: 1.0}
 
             pass_tracker_end = time.time()
 
@@ -145,7 +146,8 @@ def train():
 
         else:
             _, loss_value, conf_loss, bbox_loss, class_loss = \
-                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss]) # , feed_dict={net.dropout_keep_rate: 0.75}
+                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
+                         feed_dict={net.is_training_mode: True}) # , feed_dict={net.dropout_keep_rate: 0.75}
 
         assert not np.isnan(loss_value), \
             'Model diverged. Total loss: {}, conf_loss: {}, bbox_loss: {}, ' \

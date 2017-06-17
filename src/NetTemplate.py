@@ -129,7 +129,7 @@ class NetTemplate(object):
     def _avg_pool(self, inputs, kernel=[1,2,2,1], strides=[1,2,2,1], padding="VALID", name = "max_pool"):
         return tf.nn.avg_pool(inputs, kernel, strides, padding=padding, name=name)
 
-    def _batch_norm(self, input, name, trainable=False):
+    def _batch_norm(self, input, name, trainable=True):
         return batch_norm(input, trainable=trainable, is_training=self.is_training_mode)
 
     def _drop_out_fullyconnected(self, input, name):
