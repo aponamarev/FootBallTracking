@@ -320,19 +320,23 @@ class ObjectDetectionNet(NetTemplate):
 
                     anchor_mask = reshape(mask, [self.batch_sz, WHK])
 
-                    self.conf_loss = reduce_mean(
-                        reduce_sum(
-                            W_pos / n_obj * tf.square(self.IoU - self.anchor_confidence) * anchor_mask
-                            + (1 - anchor_mask) * self.anchor_confidence * W_neg / (WHK - n_obj),
-                            1), name='confidence_loss')
+                    conf_pos = truediv(reduce_sum(tf.square(self.IoU - self.anchor_confidence) * anchor_mask,1,
+                                                  keep_dims=True), n_obj)
+                    conf_neg = truediv(reduce_sum(tf.square((1 - anchor_mask) * self.anchor_confidence),1,
+                                                  keep_dims=True), WHK - n_obj)
+
+                    self.conf_loss = reduce_mean(W_pos * conf_pos + W_neg * conf_neg, name='confidence_loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
 
                 with tf.variable_scope('BBox'):
-                    self.bbox_loss = reduce_mean(truediv(
-                        reduce_sum(
-                            W_bbox * tf.square(mask * (self.detected_box_deltas - self.input_box_delta)), 1
-                        ), n_obj), name='bbox_loss')
+
+                    all_deltas = self.detected_box_deltas - self.input_box_delta
+                    pos_deltas = all_deltas * mask
+                    norm_deltas = reduce_sum(tf.square(pos_deltas), 1)
+                    norm_deltas = reduce_sum(truediv(norm_deltas, n_obj),1)
+
+                    self.bbox_loss = W_bbox * reduce_mean(norm_deltas, name='bbox_loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.bbox_loss)
 

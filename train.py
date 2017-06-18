@@ -147,8 +147,8 @@ def train():
             _, loss_value, conf_loss, bbox_loss, class_loss = \
                 sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
                          feed_dict={net.is_training_mode: True}) # , feed_dict={net.dropout_keep_rate: 0.75}
-            pbar.set_postfix(total_loss="{:.1f}".format(loss_value),
-                             bbox_loss="{:.2f}".format(bbox_loss), class_loss="{:.2f}".format(class_loss))
+            pbar.set_postfix(conf_loss="{:.2f}".format(conf_loss),
+                             total_loss="{:.2f}".format(loss_value))
 
         assert not np.isnan(loss_value), \
             'Model diverged. Total loss: {}, conf_loss: {}, bbox_loss: {}, ' \

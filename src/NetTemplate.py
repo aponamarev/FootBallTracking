@@ -69,7 +69,7 @@ class NetTemplate(object):
 
             self._collect_parameter_stats(W)
 
-            conv = tf.nn.conv2d(inputs, W, strides, padding)
+            conv = tf.nn.conv2d(inputs, W, strides, padding, name="conv")
 
             if bias:
                 b_size = shapes[3]
@@ -78,15 +78,19 @@ class NetTemplate(object):
                 conv = tf.nn.bias_add(conv, b, data_format='NHWC')
                 self._collect_parameter_stats(b)
 
-        return self._activation(conv)
+                conv = self._activation(conv)
+
+        return conv
 
 
     def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True):
 
-        conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding,
-                                          use_bias=bias, kernel_initializer=xavier_initializer(), name=name)
+        with tf.variable_scope(name):
+            conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding,
+                                              use_bias=bias, kernel_initializer=xavier_initializer(), name="deconv")
+            conv = self._activation(conv)
 
-        return self._activation(conv)
+        return conv
 
 
     def _concat(self, *arg, axis=3, name='merge'):
