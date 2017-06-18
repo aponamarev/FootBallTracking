@@ -323,7 +323,7 @@ class ObjectDetectionNet(NetTemplate):
                     self.conf_loss = reduce_mean(
                         reduce_sum(
                             W_pos / n_obj * tf.square(self.IoU - self.anchor_confidence) * anchor_mask
-                            + (1 - anchor_mask) * W_neg / (WHK - n_obj),
+                            + (1 - anchor_mask) * self.anchor_confidence * W_neg / (WHK - n_obj),
                             1), name='confidence_loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
