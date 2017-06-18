@@ -297,8 +297,8 @@ class ObjectDetectionNet(NetTemplate):
         W_ce = self.LOSS_COEF_CLASS # weight of cross entropy  loss (P(class))
         W_pos = self.LOSS_COEF_CONF_POS # weight of confidence loss in positive examples
         W_neg = self.LOSS_COEF_CONF_NEG # weight of confidence loss in negative examples
-        n_obj = reduce_sum(mask) # number of target objects in an image - used to normalize loss
-        tf.summary.scalar("num_objects", n_obj)
+        n_obj = reduce_sum(mask, 1) # number of target objects in an image - used to normalize loss
+        tf.summary.scalar("num_objects", reduce_mean(n_obj))
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
 
@@ -312,10 +312,9 @@ class ObjectDetectionNet(NetTemplate):
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + self.EPSILON)
                     neg_CE = (1-L) * -tf.log(1-self.P_class + self.EPSILON)
-                    tf.summary.scalar("positive_class_error", reduce_sum(pos_CE))
-                    self.P_loss = truediv(reduce_sum((pos_CE+neg_CE) * mask) * W_ce, n_obj, name='class_loss')
+                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj, name='class_loss'))
                     # add to a collection called losses to sum those losses later
-                    tf.add_to_collection('losses', self.P_loss)
+                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 
                 with tf.variable_scope('Confidence'):
 
@@ -325,21 +324,20 @@ class ObjectDetectionNet(NetTemplate):
                         reduce_sum(
                             W_pos / n_obj * tf.square(self.IoU - self.anchor_confidence) * anchor_mask
                             + (1 - anchor_mask) * W_neg / (WHK - n_obj),
-                            reduction_indices=[1]), name='confidence_loss')
+                            1), name='confidence_loss')
 
-                    tf.add_to_collection('losses', self.conf_loss)
-                    tf.summary.scalar('mean confidence', reduce_sum(self.anchor_confidence * reshape(mask,[self.batch_sz, WHK])) / n_obj)
+                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
 
                 with tf.variable_scope('BBox'):
-                    self.bbox_loss = truediv(
+                    self.bbox_loss = reduce_mean(truediv(
                         reduce_sum(
-                            W_bbox * tf.square(mask * (self.detected_box_deltas - self.input_box_delta))
-                        ), n_obj, name='bbox_loss')
+                            W_bbox * tf.square(mask * (self.detected_box_deltas - self.input_box_delta)), 1
+                        ), n_obj), name='bbox_loss')
 
-                    tf.add_to_collection('losses', self.bbox_loss)
+                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.bbox_loss)
 
                 # add above losses as well as weight decay losses to form the total loss
-                self.loss = tf.add_n(tf.get_collection('losses'), name='total')
+                self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
 
     def _add_train_graph(self):
@@ -360,7 +358,7 @@ class ObjectDetectionNet(NetTemplate):
         Args:
           total_loss: Total loss from loss().
         """
-        losses = tf.get_collection('losses')
+        losses = tf.get_collection(tf.GraphKeys.LOSSES)
 
         # Attach a scalar summary to all individual losses and the total loss; do the
         # same for the averaged version of the losses.
