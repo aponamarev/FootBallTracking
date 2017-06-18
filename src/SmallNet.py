@@ -9,7 +9,7 @@ __email__ = "alex.ponamaryov@gmail.com"
 
 
 import tensorflow as tf
-from tensorflow import name_scope, variable_scope
+from tensorflow import name_scope, variable_scope, stop_gradient
 
 from .ObjectDetection import ObjectDetectionNet
 
@@ -63,6 +63,19 @@ class SmallNet(ObjectDetectionNet):
 
             return d
 
+        def lateral_connection(td, dt, filters, name):
+
+            with variable_scope('lateral/'+name):
+                dt = stop_gradient(dt, name="stop_G")
+                dt_shape = dt.get_shape().as_list()
+                l = conv(dt, [3,3, dt_shape[3],filters], name="L")
+                output = concat((td, l))
+                out_shape = output.get_shape().as_list()
+                return conv(output, [3,3,out_shape[3], filters], name="force_choice")
+
+
+
+
         inputs = self.input_img
 
         with name_scope('inputs'):
@@ -80,17 +93,15 @@ class SmallNet(ObjectDetectionNet):
         up6 = upsampling(up5, 128, 'up6')
 
         dw5 = downsampling(up6, 128, 'd5')
-        dw5 = concat((dw5, up5))
+        dw5 = lateral_connection(dw5, up5, 128, 'tdm5')
         dw4 = downsampling(up5, 64, 'd4')
-        dw4 = concat((dw4, up4))
+        dw4 = lateral_connection(dw4, up4, 64, 'tdm4')
         dw3 = downsampling(up4, 32, 'd3')
-        dw3 = concat((dw3, up3))
+        dw3 = lateral_connection(dw3, up3, 32, 'tdm3')
         dw2 = downsampling(up3, 32, 'd2')
-        dw2 = concat((dw2, up2))
+        dw2 = lateral_connection(dw2, up2, 32, 'tdm2')
 
         dw2_shape = dw2.get_shape().as_list()
-
-        #self.featuremap = conv(dw0, [3,3,dw0_shape[3], self.K + 4 + 1 + self.n_classes])
 
         self.featuremap = conv(dw2, [3, 3, dw2_shape[3], self.K*(self.n_classes + 4 + 1)])
 

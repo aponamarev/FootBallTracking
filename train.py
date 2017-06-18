@@ -22,13 +22,13 @@ from src.util import draw_boxes, coco_boxes2xmin_ymin_xmax_ymax, \
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'src/coco/annotations/instances_train2014.json'
 PATH2IMAGES = 'src/coco/images/train2014'
-train_dir = 'logs/t1'
+train_dir = 'logs/t2'
 
 coco_labels=[1, 2, 3, 4]
-batch_sz=18
+batch_sz=24
 queue_capacity = batch_sz * 12
 prefetching_threads = 2
-imshape=(768, 512)
+imshape=(512, 512)
 gpu_id = 0
 
 summary_step = 20
@@ -147,8 +147,8 @@ def train():
             _, loss_value, conf_loss, bbox_loss, class_loss = \
                 sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
                          feed_dict={net.is_training_mode: True}) # , feed_dict={net.dropout_keep_rate: 0.75}
-            pbar.set_postfix(total_loss="{:.2f}".format(loss_value),
-                             confid_loss="{:.2f}".format(conf_loss), class_loss="{:.2f}".format(class_loss))
+            pbar.set_postfix(total_loss="{:.1f}".format(loss_value),
+                             bbox_loss="{:.2f}".format(bbox_loss), class_loss="{:.2f}".format(class_loss))
 
         assert not np.isnan(loss_value), \
             'Model diverged. Total loss: {}, conf_loss: {}, bbox_loss: {}, ' \
