@@ -94,11 +94,11 @@ class SmallNet(ObjectDetectionNet):
 
         dw5 = downsampling(up6, 128, 'd5')
         dw5 = lateral_connection(dw5, up5, 128, 'tdm5')
-        dw4 = downsampling(up5, 64, 'd4')
+        dw4 = downsampling(dw5, 64, 'd4')
         dw4 = lateral_connection(dw4, up4, 64, 'tdm4')
-        dw3 = downsampling(up4, 32, 'd3')
+        dw3 = downsampling(dw4, 32, 'd3')
         dw3 = lateral_connection(dw3, up3, 32, 'tdm3')
-        dw2 = downsampling(up3, 32, 'd2')
+        dw2 = downsampling(dw3, 32, 'd2')
         dw2 = lateral_connection(dw2, up2, 32, 'tdm2')
 
         dw2_shape = dw2.get_shape().as_list()

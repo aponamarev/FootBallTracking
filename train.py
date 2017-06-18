@@ -22,7 +22,7 @@ from src.util import draw_boxes, coco_boxes2xmin_ymin_xmax_ymax, \
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'src/coco/annotations/instances_train2014.json'
 PATH2IMAGES = 'src/coco/images/train2014'
-train_dir = 'logs/t2'
+train_dir = 'logs/t3'
 
 coco_labels=[1, 2, 3, 4]
 batch_sz=24
@@ -31,7 +31,7 @@ prefetching_threads = 2
 imshape=(512, 512)
 gpu_id = 0
 
-summary_step = 20
+summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
