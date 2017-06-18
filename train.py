@@ -25,8 +25,8 @@ PATH2IMAGES = 'src/coco/images/train2014'
 train_dir = 'logs/t3'
 
 coco_labels=[1, 2, 3, 4]
-batch_sz=24
-queue_capacity = batch_sz * 12
+batch_sz=32
+queue_capacity = batch_sz * 4
 prefetching_threads = 2
 imshape=(512, 512)
 gpu_id = 0
