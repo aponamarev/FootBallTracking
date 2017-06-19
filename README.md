@@ -12,14 +12,16 @@ Project prepared for **AraJoy.ai**
 
 
 [//]: # (Image References)
-[squeezedet]: ./Examples/SqueezeDet.png
+[squeezedet]: ./Examples/net.png
+[t]: ./Examples/t.png
+[tower1]: ./Examples/tower1.png
+[tower2]: ./Examples/tower2.png
+[tower3]: ./Examples/tower3.png
 [person1]: ./Examples/person1.png
 [person2]: ./Examples/person2.png
 [person3]: ./Examples/person3.png
 [vehicle]: ./Examples/vehicle.png
-[class_loss]: ./Examples/class_loss.png
-[bbox_loss]: ./Examples/bbox_loss.png
-[total_loss]: ./Examples/total_loss.png
+[1hlosses]: ./Examples/losses_1h.png
 [football_positions]: ./Examples/football_positions.png
 
 
@@ -42,8 +44,12 @@ In order to train CNN I am using MS COCO. The CNN will be trained to detect “p
 Later, I will use this detector to identify football players. Depending on the performance of this detector, there might be a need to fine-tune this detector on a smaller, football-centric data.
 
 Examples of training images are presented below:
-![alt_text][person1] | ![alt_text][person2]
-![alt_text][person3] | ![alt_text][vehicle]
+
+| Image examples | ... |
+| --- | --- |
+|![alt_text][person1]|![alt_text][person2]|
+![alt_text][person3]|![alt_text][vehicle]|
+
 
 #### Net Architecture
 
@@ -82,37 +88,45 @@ Reference:
 High level network architecture is presented below:
 ![alt_text][squeezedet]
 
-The network is based on a series of convolutional and deconvolutional layers strengthen with batch normalization. The training is done using Adam Loss minimization technique. Only after one hour of training, the net shows a good loss optimization trend:
-![alt_text][total_loss]
+The network is based on a series of convolutional (upsampling layers) and deconvolutional (downsampling) layers strengthened with batch normalization. Upsampling layers are formed into towers. The structure of these towers is the sames cross all 5 modules.
 
-Class discrimination subtask is especially successful:
-![alt_text][class_loss]
+The structure of upsampling module and towers is presented below:
+![alt_text][t]
+
+| Tower 1 | Tower 2 | Tower 3 |
+| --- | --- | --- |
+|![alt_text][tower1]|![alt_text][tower2]|![alt_text][tower3]|
+
+
+The training is done using Adam Loss minimization technique. Only after one hour of training, the net shows a good loss optimization trend. Class discrimination subtask is executed especially well. Whereas bounding box and anchor optimization could benefit from more training:
+![alt_text][1hlosses]
 
 #### Software
 
 For training and deployment purpose I use a Python 3.5 and a combination of libraries (TensorFlow, Numpy, OpenCV, and otether). All of the packages provided as a Conda environment or pip requirements list:
 
 Conda:
-Ubuntu - with GPU support: environment_ubuntu_GPU.yml
-MacOS - CPU only: environment_mac_cpu.yml
+
+- Ubuntu - with GPU support: environment_ubuntu_GPU.yml
+- MacOS - CPU only: environment_mac_cpu.yml
+
 
 PIP:
-requirements.txt
+- requirements.txt
 
 
 #### Hardware
 
 For trainnig purpose I use an EC2 instance from AWS. This instance is launched on spot basis for cost efficiency. Therefore, training repository is located on an external harddrive.
 
-Instance specification:
-Instance type: p2.xlarge
-AMI ID: Alex-Udacity-CarND (ami-5fc5a149)
+- Instance specification:
+- Instance type: p2.xlarge
+- AMI ID: Alex-Udacity-CarND (ami-5fc5a149)
 
 Instance is equiped with NVIDIA GPU. GPU specification is presented below:
-name: Tesla K80
-major: 3 minor: 7 memoryClockRate (GHz) 0.8235
-Total memory: 11.17GiB
+
+- name: Tesla K80
+- major: 3 minor: 7 memoryClockRate (GHz) 0.8235
+- Total memory: 11.17GiB
 
 For more information contact: Alexander Ponamarev (alex.ponamaryov@gmail.com)
-
-
