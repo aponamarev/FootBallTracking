@@ -103,12 +103,12 @@ def train():
     config.gpu_options.allow_growth = True
     config.allow_soft_placement = True
     sess = tf.Session(config=config, graph=graph)
+    sess.run(initializer)
 
     if restore_model:
         saver = tf.train.Saver(net.weights)
-        saver.restore(sess, train_dir)
-    else:
-        sess.run(initializer)
+        saver.restore(sess, join(train_dir, 'model.ckpt'))
+
 
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
