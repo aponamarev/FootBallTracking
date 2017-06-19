@@ -21,7 +21,7 @@ class ObjectDetectionNet(NetTemplate):
 
 
 
-    def __init__(self, labels_provided, batch_sz, imshape,
+    def __init__(self, labels_provided, batch_sz, imshape, lr,
                  anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
         """
         A skeleton of SqueezeDet Net.
@@ -32,7 +32,7 @@ class ObjectDetectionNet(NetTemplate):
         :param imshape: input image width(x) and height (y)
         :param anchor_shapes: anchor shapes to be applied to each cell of the feature map
         """
-        self.lr = 0.001
+        self.lr = lr
 
         self.featuremap = None
 

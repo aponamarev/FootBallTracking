@@ -25,6 +25,10 @@ PATH2IMAGES = 'src/coco/images/train2014'
 train_dir = 'logs/t3'
 
 coco_labels=[1, 2, 3, 4]
+
+learning_rate = 1e-4
+restore_model = True
+
 batch_sz=32
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
@@ -63,7 +67,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, batch_sz, imshape)
+            net = SmallNet(coco_labels, batch_sz, imshape, learning_rate)
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
             labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
             mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
@@ -87,6 +91,7 @@ def train():
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
         saver = tf.train.Saver(tf.global_variables())
+
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter(train_dir, graph)
 
@@ -98,7 +103,12 @@ def train():
     config.gpu_options.allow_growth = True
     config.allow_soft_placement = True
     sess = tf.Session(config=config, graph=graph)
-    sess.run(initializer)
+
+    if restore_model:
+        saver = tf.train.Saver(net.weights)
+        saver.restore(sess, train_dir)
+    else:
+        sess.run(initializer)
 
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
