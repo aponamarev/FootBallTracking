@@ -31,47 +31,46 @@ class SmallNet(ObjectDetectionNet):
 
         def upsampling(input, filters, name):
 
-            with variable_scope('upsampling/' + name):
+            with variable_scope('upsampling_' + name):
                 input = bn(input, name=name)
-                shape = input.get_shape().as_list()
-                t1 = conv(input, [3, 3, shape[3], filters], name='t1/conv1')
-                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv2')
-                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv3')
-                t1 = conv(t1, [3, 3, filters, filters], name='t1/conv4')
-                t1 = maxpool(t1, name='t1/maxpool', padding='SAME')
+                with variable_scope('tower1'):
+                    t1 = conv(input, filters, name='conv1')
+                    t1 = conv(t1, filters, name='conv2')
+                    t1 = bn(t1, name='batch_norm')
+                    t1 = conv(t1, filters, name='conv3')
+                    t1 = conv(t1, filters, name='conv4')
+                    t1 = maxpool(t1, name='maxpool', padding='SAME')
 
-                t2 = conv(input, [3, 3, shape[3], filters], name='t2/conv1')
-                t2 = conv(t2, [3, 3, filters, filters], name='t2/conv2')
-                t2 = maxpool(t2, name='t2/maxpool', padding='SAME')
+                with variable_scope('tower2'):
+                    t2 = conv(input, filters, name='conv1')
+                    t2 = conv(t2, filters, name='conv2')
+                    t2 = maxpool(t2, name='maxpool', padding='SAME')
 
-                t3 = conv(input, [1, 1, shape[3], filters], name='t3/conv1')
-                t3 = maxpool(t3, name='t3/maxpool', padding='SAME')
+                with variable_scope('tower3'):
+                    t3 = conv(input, filters, bias=False, name='regularization')
+                    t3 = maxpool(t3, name='maxpool', padding='SAME')
 
-                c = concat([t1, t2, t3], axis=3)
-                c_shape = c.get_shape().as_list()
-                c = conv(c, [1,1,c_shape[3],filters], name="output")
+                c = concat([t1, t2, t3], axis=3, name='concat')
+                c = conv(c, filters, name="output")
 
             return c
 
         def downsampling(input, filters, name):
-            shape = input.get_shape().as_list()
 
-            with variable_scope('downsampling/' + name):
-                input = bn(input, name=name)
+            with variable_scope('downsampling_' + name):
+                input = bn(input, name='batch_norm')
                 d = deconv(input, filters, [3,3], [2,2], padding='SAME')
-                d = conv(d, [3,3,filters,filters], name='output')
+                d = conv(d, filters, name='output')
 
             return d
 
         def lateral_connection(td, dt, filters, name):
 
-            with variable_scope('lateral/'+name):
+            with variable_scope('lateral_'+name):
                 dt = stop_gradient(dt, name="stop_G")
-                dt_shape = dt.get_shape().as_list()
-                l = conv(dt, [3,3, dt_shape[3],filters], name="L")
+                l = conv(dt, filters, name="L")
                 output = concat((td, l))
-                out_shape = output.get_shape().as_list()
-                return conv(output, [3,3,out_shape[3], filters], name="force_choice")
+                return conv(output, filters, name="force_choice")
 
 
 
@@ -80,7 +79,7 @@ class SmallNet(ObjectDetectionNet):
 
         with name_scope('inputs'):
 
-            tf.summary.image("imgs", inputs, max_outputs=6)
+            tf.summary.image("imgs", inputs, max_outputs=2)
 
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
@@ -89,21 +88,16 @@ class SmallNet(ObjectDetectionNet):
         up2 = upsampling(up1, 16, 'up2')
         up3 = upsampling(up2, 32, 'up3')
         up4 = upsampling(up3, 64, 'up4')
-        up5 = upsampling(up4, 128, 'up5')
-        up6 = upsampling(up5, 128, 'up6')
+        up5 = upsampling(up4, 64, 'up5')
 
-        dw5 = downsampling(up6, 128, 'd5')
-        dw5 = lateral_connection(dw5, up5, 128, 'tdm5')
-        dw4 = downsampling(dw5, 64, 'd4')
+        dw4 = downsampling(up5, 64, 'd4')
         dw4 = lateral_connection(dw4, up4, 64, 'tdm4')
         dw3 = downsampling(dw4, 32, 'd3')
-        dw3 = lateral_connection(dw3, up3, 32, 'tdm3')
+        dw3 = lateral_connection(dw3, up3, 64, 'tdm3')
         dw2 = downsampling(dw3, 32, 'd2')
         dw2 = lateral_connection(dw2, up2, 32, 'tdm2')
 
-        dw2_shape = dw2.get_shape().as_list()
-
-        self.featuremap = conv(dw2, [3, 3, dw2_shape[3], self.K*(self.n_classes + 4 + 1)])
+        self.featuremap = conv(dw2, self.K*(self.n_classes + 4 + 1), name='featuremap')
 
 
 

@@ -7,7 +7,7 @@ __author__ = "Alexander Ponamarev"
 __email__ = "alex.ponamaryov@gmail.com"
 
 
-from .coco.PythonAPI.pycocotools.coco import COCO as C
+from dataset.coco.PythonAPI.pycocotools.coco import COCO as C
 from .util import check_path, assert_list
 from os.path import join
 from cv2 import imread, cvtColor, COLOR_BGR2RGB

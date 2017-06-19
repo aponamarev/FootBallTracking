@@ -16,20 +16,18 @@ from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet
-from src.util import draw_boxes, coco_boxes2xmin_ymin_xmax_ymax, \
-    coco_boxes2cxcywh, cxcywh_xmin_ymin_xmax_ymax, resize_wo_scale_dist
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
-ANNOTATIONS_FILE = 'src/coco/annotations/instances_train2014.json'
-PATH2IMAGES = 'src/coco/images/train2014'
-train_dir = 'logs/t3'
+ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
+PATH2IMAGES = 'dataset/coco/images/train2014'
+train_dir = 'logs/t4/'
 
 coco_labels=[1, 2, 3, 4]
 
 learning_rate = 1e-4
-restore_model = True
+restore_model = False
 
-batch_sz=32
+batch_sz=24
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
 imshape=(512, 512)
@@ -39,7 +37,7 @@ summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
-coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES) # TODO: Move to after the set up of inputs to speed up debugging
+coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
 def generate_sample(net):
     looking = True
@@ -68,13 +66,16 @@ def train():
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
             net = SmallNet(coco_labels, batch_sz, imshape, learning_rate)
+
+            # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
             labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
             mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
             deltas_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="deltas_gt")
             bbox_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="bbox_gt")
-            # Add inputs to graph collections to have access to them after recovery.
+
             inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
+
             # Create a queue that will be prefetching samples
             shapes = [v.get_shape().as_list() for v in inputs]
             queue = FIFOQueue(capacity=queue_capacity,
@@ -97,7 +98,6 @@ def train():
 
         # Launch coordinator that will manage threads
         coord = tf.train.Coordinator()
-        #graph.finalize()
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -136,7 +136,7 @@ def train():
             ]
 
             _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
-                sess.run(op_list, feed_dict={net.is_training_mode: False}) # , feed_dict={net.dropout_keep_rate: 1.0}
+                sess.run(op_list, feed_dict={net.is_training: False})
 
             pass_tracker_end = time.time()
 
@@ -156,7 +156,7 @@ def train():
         else:
             _, loss_value, conf_loss, bbox_loss, class_loss = \
                 sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
-                         feed_dict={net.is_training_mode: True}) # , feed_dict={net.dropout_keep_rate: 0.75}
+                         feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
             pbar.set_postfix(conf_loss="{:.2f}".format(conf_loss),
                              total_loss="{:.2f}".format(loss_value))
 

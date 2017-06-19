@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
     unstack, identity, stack, truediv
-from .util import safe_exp, bbox_transform, set_anchors, resize_wo_scale_dist,\
+from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, resize_wo_scale_dist,\
     find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, convertToFixedSize, sparse_to_dense
 from .NetTemplate import NetTemplate
 
@@ -46,10 +46,10 @@ class ObjectDetectionNet(NetTemplate):
         self.anchors = set_anchors(imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
-        self.LOSS_COEF_BBOX = 5
-        self.LOSS_COEF_CLASS = 1
-        self.LOSS_COEF_CONF_POS = 75
-        self.LOSS_COEF_CONF_NEG = 100
+        self.LOSS_COEF_BBOX = 5.0 # should be float
+        self.LOSS_COEF_CLASS = 1.0 # should be float
+        self.LOSS_COEF_CONF_POS = 75.0 # should be float
+        self.LOSS_COEF_CONF_NEG = 100.0 # should be float
         self.input_img = None
 
         self.input_box_values = None #[xmin, ymin, xmax, ymax]
@@ -222,29 +222,34 @@ class ObjectDetectionNet(NetTemplate):
                 ymin = tf.minimum(tf.maximum(0.0, ymin), np.float32(imshape.x - 1.0), name="xmin")
                 ymax = tf.maximum(tf.minimum(np.float32(imshape.y - 1.0), ymax), 0.0, name="xmax")
 
-                det_box = stack(bbox_transform([xmin, ymin, xmax, ymax]))
+                det_box = stack(bbox_transform_inv([xmin, ymin, xmax, ymax]))
                 self.det_boxes = tf.transpose(det_box, (1, 2, 0), name="box_prediction")
                 tf.add_to_collection("predictions", self.det_boxes)
 
 
             with variable_scope('IOU'):
 
-                box1 = bbox_transform(unstack(self.det_boxes, axis=2))
+                #box1 = bbox_transform(unstack(self.det_boxes, axis=2))
                 box2 = bbox_transform(unstack(self.input_box_values, axis=2))
 
                 with tf.variable_scope('intersection'):
-                    xmin = tf.maximum(box1[0], box2[0], name='xmin')
-                    ymin = tf.maximum(box1[1], box2[1], name='ymin')
-                    xmax = tf.minimum(box1[2], box2[2], name='xmax')
-                    ymax = tf.minimum(box1[3], box2[3], name='ymax')
+                    #xmin = tf.maximum(box1[0], box2[0], name='xmin')
+                    #ymin = tf.maximum(box1[1], box2[1], name='ymin')
+                    #xmax = tf.minimum(box1[2], box2[2], name='xmax')
+                    #ymax = tf.minimum(box1[3], box2[3], name='ymax')
 
-                    w = tf.maximum(0.0, xmax - xmin, name='inter_w')
-                    h = tf.maximum(0.0, ymax - ymin, name='inter_h')
+                    inters_xmin = tf.maximum(xmin, box2[0], name='xmin')
+                    inters_ymin = tf.maximum(ymin, box2[1], name='ymin')
+                    inters_xmax = tf.minimum(xmax, box2[2], name='xmax')
+                    inters_ymax = tf.minimum(ymax, box2[3], name='ymax')
+
+                    w = tf.maximum(0.0, inters_xmax - inters_xmin, name='inter_w')
+                    h = tf.maximum(0.0, inters_ymax - inters_ymin, name='inter_h')
                     intersection = tf.multiply(w, h, name='intersection')
 
                 with tf.variable_scope('union'):
-                    w1 = tf.subtract(box1[2], box1[0], name='w1')
-                    h1 = tf.subtract(box1[3], box1[1], name='h1')
+                    w1 = tf.subtract(xmax, xmin, name='w1')
+                    h1 = tf.subtract(ymax, ymin, name='h1')
                     w2 = tf.subtract(box2[2], box2[0], name='w2')
                     h2 = tf.subtract(box2[3], box2[1], name='h2')
 
@@ -312,7 +317,7 @@ class ObjectDetectionNet(NetTemplate):
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + self.EPSILON)
                     neg_CE = (1-L) * -tf.log(1-self.P_class + self.EPSILON)
-                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj, name='class_loss'))
+                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj), name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 
@@ -325,7 +330,7 @@ class ObjectDetectionNet(NetTemplate):
                     conf_neg = truediv(reduce_sum(tf.square((1 - anchor_mask) * self.anchor_confidence),1,
                                                   keep_dims=True), WHK - n_obj)
 
-                    self.conf_loss = reduce_mean(W_pos * conf_pos + W_neg * conf_neg, name='confidence_loss')
+                    self.conf_loss = reduce_mean(W_pos * conf_pos + W_neg * conf_neg, name='loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
 
@@ -336,12 +341,12 @@ class ObjectDetectionNet(NetTemplate):
                     norm_deltas = reduce_sum(tf.square(pos_deltas), 1)
                     norm_deltas = reduce_sum(truediv(norm_deltas, n_obj),1)
 
-                    self.bbox_loss = W_bbox * reduce_mean(norm_deltas, name='bbox_loss')
+                    self.bbox_loss = tf.multiply(W_bbox, reduce_mean(norm_deltas), name='loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.bbox_loss)
 
                 # add above losses as well as weight decay losses to form the total loss
-                self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+                self.loss = tf.add_n(tf.get_collection(tf.GraphKeys.LOSSES), name='total_loss')
 
 
     def _add_train_graph(self):

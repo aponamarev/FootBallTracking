@@ -9,10 +9,10 @@ class NetTemplate(object):
                  dtype=tf.float32):
         self.weights = []
         self.size = []
-        self.dropout_keep_rate = tf.placeholder(dtype=tf.float32, shape=[], name="dropout_keep_prob")
-        tf.add_to_collection('inputs', self.dropout_keep_rate)
-        self.is_training_mode = tf.placeholder(dtype=tf.bool, shape=[], name="is_training_phase")
-        tf.add_to_collection('inputs', self.is_training_mode)
+        self.dropout_rate = tf.placeholder(dtype=tf.float32, shape=[], name="dropout")
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.dropout_rate)
+        self.is_training = tf.placeholder(dtype=tf.bool, shape=[], name="is_training")
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.is_training)
         self._default_activation = default_activation
         self._default_activation_summary = 'img'
         self._dtype = dtype
@@ -58,27 +58,17 @@ class NetTemplate(object):
         raise NotImplementedError("Loss estimate was not defined!")
 
 
-    def _conv2d(self, inputs, shapes, strides=[1,1,1,1], padding="SAME",name="conv2d", bias=True, dtype=None):
-        dtype = dtype or self._dtype
-        # Create weights and biases
+    def _conv2d(self, inputs, filters, kernel_size=3, strides=[1,1], padding="SAME",name="conv2d", bias=True):
+        """
+        kernel_size: An integer or tuple/list of 2 integers, specifying the width and height of the 2D convolution window.
+        Can be a single integer to specify the same value for all spatial dimensions.
+        """
         with tf.variable_scope(name):
-            W = tf.get_variable("W",
-                                shapes,
-                                dtype=dtype,
-                                initializer=tf.contrib.layers.xavier_initializer_conv2d())
 
-            self._collect_parameter_stats(W)
+            conv = tf.layers.conv2d(inputs, filters, kernel_size, strides, padding,
+                                    use_bias=bias, kernel_initializer=xavier_initializer())
 
-            conv = tf.nn.conv2d(inputs, W, strides, padding, name="conv")
-
-            if bias:
-                b_size = shapes[3]
-                b_init = tf.zeros(b_size, dtype=dtype)
-                b = tf.Variable(b_init, name="b")
-                conv = tf.nn.bias_add(conv, b, data_format='NHWC')
-                self._collect_parameter_stats(b)
-
-                conv = self._activation(conv)
+            conv = self._activation(conv)
 
         return conv
 
@@ -134,10 +124,10 @@ class NetTemplate(object):
         return tf.nn.avg_pool(inputs, kernel, strides, padding=padding, name=name)
 
     def _batch_norm(self, input, name, trainable=True):
-        return batch_norm(input, trainable=trainable, is_training=self.is_training_mode)
+        return batch_norm(input, trainable=trainable, is_training=self.is_training)
 
     def _drop_out_fullyconnected(self, input, name):
-        return tf.nn.dropout(input, self.dropout_keep_rate, name=name)
+        return tf.nn.dropout(input, self.dropout_rate, name=name)
 
     def _drop_out_conv(self, input, name):
         shape = input.get_shape().as_list()
