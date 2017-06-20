@@ -108,7 +108,7 @@ def check_path(p):
     """
 
     if not exists(p):
-        raise FileExistsError("Provided path doesn't exist: {}".format_map(p))
+        raise FileExistsError("Provided path doesn't exist: {}".format(p))
 
     return p
 

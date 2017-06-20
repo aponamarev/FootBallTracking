@@ -65,7 +65,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, batch_sz, imshape, learning_rate)
+            net = SmallNet(coco_labels, imshape, learning_rate)
 
             # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")

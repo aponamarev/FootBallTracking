@@ -16,12 +16,13 @@ from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, res
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
+Predictions = namedtuple("Predictions", ['bboxes','conf','classes'])
 
 class ObjectDetectionNet(NetTemplate):
 
 
 
-    def __init__(self, labels_provided, batch_sz, imshape, lr,
+    def __init__(self, labels_provided, imshape, lr,
                  anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
         """
         A skeleton of SqueezeDet Net.
@@ -33,14 +34,13 @@ class ObjectDetectionNet(NetTemplate):
         :param anchor_shapes: anchor shapes to be applied to each cell of the feature map
         """
         self.lr = lr
-
+        
         self.featuremap = None
 
         self.imshape = Point(*imshape)
         self.outshape = Point(int(imshape[0]/4), int(imshape[1]/4))
         self.labels_available = labels_provided
         self.n_classes = len(labels_provided)
-        self.batch_sz = batch_sz
         self.K = len(anchor_shapes)
         self.WHK = self.K * self.outshape.x * self.outshape.y
         self.anchors = set_anchors(imshape, self.outshape, anchor_shapes)
@@ -155,13 +155,13 @@ class ObjectDetectionNet(NetTemplate):
         featuremap = self.featuremap
         n_classes = self.n_classes
         mask = self.input_mask
-        b_sz = self.batch_sz
+        # b_sz = self.batch_sz
         K = self.K
         KC = self.K * self.n_classes
         WHK = self.WHK
 
         # Tensor representing the IOU between predicted bbox and gt bbox
-        self.IoU = tf.Variable(initial_value=np.zeros((b_sz, WHK)),
+        self.IoU = tf.Variable(initial_value=np.zeros((-1, WHK)),
                                       trainable=False, name='IoU', dtype=tf.float32)
 
         with variable_scope('classes'):
@@ -177,7 +177,7 @@ class ObjectDetectionNet(NetTemplate):
                                             [-1, n_classes])
                 # Softmax calculates probability distribution over the last dimension (classes)
                 P_class = nn.softmax(class_logits)
-                self.P_class = reshape(P_class, [b_sz, WHK, n_classes], name="P")
+                self.P_class = reshape(P_class, [-1, WHK, n_classes], name="P")
 
             with variable_scope('confidence'):
                 """
@@ -186,7 +186,7 @@ class ObjectDetectionNet(NetTemplate):
                 # Extract anchor logits for each image (batch sz dimension)
                 n_anchors_slice = (KC + K)
                 anchor_confidence = reshape(featuremap[:, :, :, KC:n_anchors_slice],
-                                            [b_sz, WHK])
+                                            [-1, WHK])
                 # Estimate highest confidence
                 self.anchor_confidence = sigmoid(anchor_confidence, name="C")
 
@@ -194,7 +194,7 @@ class ObjectDetectionNet(NetTemplate):
             """
             """
             box_deltas = featuremap[:,:,:, n_anchors_slice:]
-            self.detected_box_deltas = reshape(box_deltas, [b_sz, WHK, 4], name="deltas")
+            self.detected_box_deltas = reshape(box_deltas, [-1, WHK, 4], name="deltas")
             imshape = self.imshape
 
             with variable_scope('stretching'):
@@ -256,12 +256,12 @@ class ObjectDetectionNet(NetTemplate):
                     union = w1 * h1 + w2 * h2 - intersection
 
                 self.IoU = self.IoU.assign(
-                    intersection/(union+self.EPSILON) * reshape(mask, [b_sz, self.WHK])
+                    intersection/(union+self.EPSILON) * reshape(mask, [-1, self.WHK])
                 )
 
             with variable_scope('probability'):
 
-                probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [b_sz, WHK, 1], name='final_class_prob'))
+                probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [-1, WHK, 1], name='final_class_prob'))
 
                 self.det_probs = tf.reduce_max(probs, 2, name='score')
                 tf.add_to_collection("predictions", self.det_probs)
@@ -323,7 +323,7 @@ class ObjectDetectionNet(NetTemplate):
 
                 with tf.variable_scope('Confidence'):
 
-                    anchor_mask = reshape(mask, [self.batch_sz, WHK])
+                    anchor_mask = reshape(mask, [-1, WHK])
 
                     conf_pos = truediv(reduce_sum(tf.square(self.IoU - self.anchor_confidence) * anchor_mask,1,
                                                   keep_dims=True), n_obj)
@@ -373,6 +373,13 @@ class ObjectDetectionNet(NetTemplate):
         # same for the averaged version of the losses.
         for l in losses + [total_loss]:
             tf.summary.scalar(l.op.name, l)
+
+
+    def infer(self, X_batch, sess):
+        p = Predictions(sess.run([self.det_boxes, self.anchor_confidence, self.P_class],
+                                 feed_dict={self.input_img: np.expand_dims(X_batch, 0),
+                                            sess.is_training: False}))
+        return p
 
 
 
