@@ -68,6 +68,7 @@ class NetTemplate(object):
             conv = tf.layers.conv2d(inputs, filters, kernel_size, strides, padding,
                                     use_bias=bias, kernel_initializer=xavier_initializer())
 
+
             conv = self._activation(conv)
 
         return conv

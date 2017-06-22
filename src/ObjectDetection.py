@@ -12,7 +12,7 @@ import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
     unstack, identity, stack, truediv
 from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, resize_wo_scale_dist,\
-    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, convertToFixedSize, sparse_to_dense
+    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, convertToFixedSize, sparse_to_dense, nms
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
@@ -34,7 +34,7 @@ class ObjectDetectionNet(NetTemplate):
         :param anchor_shapes: anchor shapes to be applied to each cell of the feature map
         """
         self.lr = lr
-        
+
         self.featuremap = None
 
         self.imshape = Point(*imshape)
@@ -63,6 +63,7 @@ class ObjectDetectionNet(NetTemplate):
         super().__init__()
 
     def setup_inputs(self, img, bbox, deltas, mask, labels):
+
         self.input_img = img
         tf.add_to_collection(tf.GraphKeys.RESOURCES, self.input_img)
 
@@ -82,35 +83,6 @@ class ObjectDetectionNet(NetTemplate):
         self._add_obj_detection()
         self._add_loss_graph()
         self._add_train_graph()
-
-    def preprocess_COCO(self, img, labels, bboxes):
-        """
-        Transforms inputs into expected net format.
-        :param img: RGB img -> will be scaled to a fixed size
-        :param labels:
-        :param bboxes: [[cx,cy,w,h]] where y=0 is the image bottom - will be scalled to a fixed size
-        :return: img, labels, mask, bbox_values, bbox_deltas
-        """
-
-        # 1. Rescale images to the same fixed size
-        im, scale = resize_wo_scale_dist(img, self.imshape)
-        bboxes = np.array(bboxes) * scale
-
-        # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
-        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
-        labels = list(map(lambda x: self.labels_available.index(x), labels))
-
-        # 3. Find mask (anchor ids)
-        aids = find_anchor_ids(bboxes, self.anchors)
-
-        # 4. Calculate deltas between anchors and bounding boxes
-        deltas = estimate_deltas(bboxes, aids, self.anchors)
-
-        # 5. Convert to dense annotations
-
-        dense = self._map_to_grid(labels, bboxes, aids, deltas)
-
-        return im, dense['dense_labels'], dense['masks'], dense['bbox_deltas'], dense['bbox_values']
 
 
 
@@ -160,10 +132,6 @@ class ObjectDetectionNet(NetTemplate):
         KC = self.K * self.n_classes
         WHK = self.WHK
 
-        # Tensor representing the IOU between predicted bbox and gt bbox
-        self.IoU = tf.Variable(initial_value=np.zeros((-1, WHK)),
-                                      trainable=False, name='IoU', dtype=tf.float32)
-
         with variable_scope('classes'):
             # probability
             with variable_scope('probability'):
@@ -199,18 +167,19 @@ class ObjectDetectionNet(NetTemplate):
 
             with variable_scope('stretching'):
                 dx, dy, dw, dh = unstack(self.detected_box_deltas, axis=2)
-                x = self.anchors[:, 0] #0 is for x
-                y = self.anchors[:, 1] #1 is for y
-                w = self.anchors[:, 2] #2 is for w
-                h = self.anchors[:, 3] #3 is for h
+                type_to_cast = dx.dtype.as_numpy_dtype
+                x = np.array(self.anchors[:, 0], dtype=type_to_cast) #0 is for x
+                y = np.array(self.anchors[:, 1], dtype=type_to_cast) #1 is for y
+                w = np.array(self.anchors[:, 2], dtype=type_to_cast) #2 is for w
+                h = np.array(self.anchors[:, 3], dtype=type_to_cast) #3 is for h
 
                 # let's copy the result of box adjustments
-                center_x = identity(x + dx * w, name='cx')
-                center_y = identity(y + dy * h, name='cy')
+                center_x = tf.add(x, dx * w, name='cx') #center_x = identity(x + dx * w, name='cx')
+                center_y = tf.add(y, dy * h, name='cy') # center_y = identity(y + dy * h, name='cy')
                 # exponent is used to undo the log used to pack box width and height
-                width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
+                width = tf.multiply(w, safe_exp(dw, self.EXP_THRESH), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
                 # exponent is used to undo the log used to pack box width and height
-                height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
+                height = tf.multiply(h, safe_exp(dh, self.EXP_THRESH), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
 
             with variable_scope('trimming'):
                 '''
@@ -255,9 +224,7 @@ class ObjectDetectionNet(NetTemplate):
 
                     union = w1 * h1 + w2 * h2 - intersection
 
-                self.IoU = self.IoU.assign(
-                    intersection/(union+self.EPSILON) * reshape(mask, [-1, self.WHK])
-                )
+                self.IoU = tf.multiply(intersection/(union+self.EPSILON), reshape(mask, [-1, self.WHK]), name='IoU')
 
             with variable_scope('probability'):
 
@@ -357,6 +324,9 @@ class ObjectDetectionNet(NetTemplate):
         self.train_op = opt.minimize(self.loss)
         tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
 
+        for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            tf.summary.histogram(var.op.name, var)
+
 
     def _add_loss_summaries(self, total_loss):
         """
@@ -369,6 +339,7 @@ class ObjectDetectionNet(NetTemplate):
         """
         losses = tf.get_collection(tf.GraphKeys.LOSSES)
 
+
         # Attach a scalar summary to all individual losses and the total loss; do the
         # same for the averaged version of the losses.
         for l in losses + [total_loss]:
@@ -376,10 +347,79 @@ class ObjectDetectionNet(NetTemplate):
 
 
     def infer(self, X_batch, sess):
-        p = Predictions(sess.run([self.det_boxes, self.anchor_confidence, self.P_class],
-                                 feed_dict={self.input_img: np.expand_dims(X_batch, 0),
-                                            sess.is_training: False}))
+        p = Predictions(*sess.run([self.det_boxes, self.det_probs, self.det_class],
+                                  feed_dict={self.input_img: np.expand_dims(X_batch, 0),
+                                             self.is_training: False}))
         return p
+
+    def filter_prediction(self, boxes, probs, cls_idx, TOP_N_DETECTION=50, PROB_THRESH=0.5, NMS_THRESH=0.2):
+        """Filter bounding box predictions with probability threshold and
+        non-maximum supression.
+        Args:
+          boxes: array of [cx, cy, w, h].
+          probs: array of probabilities
+          cls_idx: array of class indices
+        Returns:
+          final_boxes: array of filtered bounding boxes.
+          final_probs: array of filtered probabilities
+          final_cls_idx: array of filtered class indices
+        """
+
+        if TOP_N_DETECTION < len(probs) and TOP_N_DETECTION > 0:
+            order = probs.argsort()[:-TOP_N_DETECTION - 1:-1]
+            probs = probs[order]
+            boxes = boxes[order]
+            cls_idx = cls_idx[order]
+        else:
+            filtered_idx = np.nonzero(probs > PROB_THRESH)[0]
+            probs = probs[filtered_idx]
+            boxes = boxes[filtered_idx]
+            cls_idx = cls_idx[filtered_idx]
+
+        final_boxes = []
+        final_probs = []
+        final_cls_idx = []
+
+        for c in range(self.n_classes):
+            idx_per_class = [i for i in range(len(probs)) if cls_idx[i] == c]
+            keep = nms(boxes[idx_per_class], probs[idx_per_class], NMS_THRESH)
+            for i in range(len(keep)):
+                if keep[i]:
+                    final_boxes.append(boxes[idx_per_class[i]])
+                    final_probs.append(probs[idx_per_class[i]])
+                    final_cls_idx.append(c)
+
+        return final_boxes, final_probs, final_cls_idx
+
+
+    def preprocess_COCO(self, img, labels, bboxes):
+        """
+        Transforms inputs into expected net format.
+        :param img: RGB img -> will be scaled to a fixed size
+        :param labels:
+        :param bboxes: [[cx,cy,w,h]] where y=0 is the image bottom - will be scalled to a fixed size
+        :return: img, labels, mask, bbox_values, bbox_deltas
+        """
+
+        # 1. Rescale images to the same fixed size
+        im, scale = resize_wo_scale_dist(img, self.imshape)
+        bboxes = np.array(bboxes) * scale
+
+        # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
+        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
+        labels = list(map(lambda x: self.labels_available.index(x), labels))
+
+        # 3. Find mask (anchor ids)
+        aids = find_anchor_ids(bboxes, self.anchors)
+
+        # 4. Calculate deltas between anchors and bounding boxes
+        deltas = estimate_deltas(bboxes, aids, self.anchors)
+
+        # 5. Convert to dense annotations
+
+        dense = self._map_to_grid(labels, bboxes, aids, deltas)
+
+        return im, dense['dense_labels'], dense['masks'], dense['bbox_deltas'], dense['bbox_values']
 
 
 

@@ -16,6 +16,7 @@ from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet
+from src.util import coco_boxes2cxcywh
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
@@ -44,6 +45,9 @@ def generate_sample(net):
     while looking:
         try:
             im, labels, bboxes = coco.get_sample()
+
+            bboxes = list(map(lambda b: coco_boxes2cxcywh(im, b), bboxes))
+
             im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
             looking = False
         except:

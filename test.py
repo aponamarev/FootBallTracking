@@ -16,7 +16,7 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
 
-path_to_net = 'logs/t4/model.ckpt'
+path_to_net = 'logs/model.ckpt'
 imshape = (512, 512)
 batch_size = 1
 
@@ -35,7 +35,7 @@ def main():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, batch_size, imshape)
+            net = SmallNet(coco_labels, imshape)
 
             # Create input placeholders for the net
             im_ph = placeholder(dtype=tf.float32, shape=[None,*imshape[::-1], 3], name="img")
@@ -65,26 +65,34 @@ def main():
     saver.restore(sess, path_to_net)
 
     for p in img_list:
-        im = cvtColor(imread(check_path(p), COLOR_BGR2RGB))
-        im = process(im, net, sess, threshold=0.7, max_obj=50)
+        im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
+        im = process(im, net, sess, threshold=0.5, NMS_THRESH=0.1, max_obj=50)
         imshow(im)
 
 
 
 
-def process(img, net, sess, threshold=0.7, max_obj=50):
+def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
 
-    img = resize_wo_scale_dist(img, imshape)
-    p  = net.infer(img, sess)
-    t = p.conf>threshold
-    bboxes, conf, classes = p.bboxes[t], p.conf[t], p.classes[t]
-    i = np.argsort(conf)[-min(len(conf), max_obj):]
-    bboxes, conf, classes = bboxes[i], conf[i], np.argmax(classes[i], 1)
 
-    img = draw_boxes(img, map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), bboxes),
-                     map(lambda j, x: CLASSES[x]+"{:.1f}%".format(conf[j]*100)), enumerate(classes))
 
-    return img[0]
+    img, _ = resize_wo_scale_dist(img, imshape)
+    p = net.infer(img, sess)
+
+    for i in range(len(p.bboxes)):
+
+        label = []
+
+        final_boxes, final_probs, final_cls_idx = \
+            net.filter_prediction(p.bboxes[i], p.conf[i], p.classes[i],
+                                  PROB_THRESH=threshold, NMS_THRESH=NMS_THRESH, TOP_N_DETECTION=max_obj)
+        for box_id in range(len(final_boxes)):
+            kernel_id = final_cls_idx[box_id]
+            label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[kernel_id] * 100)))
+
+        img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
+
+    return img
 
 
 if __name__=="__main__":
