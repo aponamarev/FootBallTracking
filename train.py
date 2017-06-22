@@ -25,10 +25,10 @@ train_dir = 'logs/t4/'
 
 coco_labels=[1, 2, 3, 4]
 
-learning_rate = 1e-4
-restore_model = False
+learning_rate = 1e-5
+restore_model = True
 
-batch_sz=24
+batch_sz=32
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
 imshape=(512, 512)
@@ -95,7 +95,7 @@ def train():
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
-        saver = tf.train.Saver(tf.global_variables())
+        saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
 
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter(train_dir, graph)
@@ -110,7 +110,7 @@ def train():
     sess.run(initializer)
 
     if restore_model:
-        saver = tf.train.Saver(net.weights)
+        saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
         saver.restore(sess, join(train_dir, 'model.ckpt'))
 
 

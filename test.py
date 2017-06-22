@@ -60,7 +60,7 @@ def main():
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
 
-    var_to_recover = graph.get_collection(tf.GraphKeys.VARIABLES)
+    var_to_recover = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
     saver = tf.train.Saver(var_to_recover, reshape=True)
     saver.restore(sess, path_to_net)
 
