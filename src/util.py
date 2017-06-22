@@ -146,6 +146,8 @@ def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FON
         origin = (int(label_x), int(Y-label_y))
         putText(img, l, origin, fontFace, fontScale, color, thickness)
 
+    return img
+
 
 def coco_boxes2xmin_ymin_xmax_ymax(img, box):
     """
@@ -432,7 +434,7 @@ def nms(boxes, probs, threshold):
 
     for i in range(len(order)-1):
         ovps = batch_iou(boxes[order[i+1:]], boxes[order[i]])
-    for j, ov in enumerate(ovps):
-        if ov > threshold:
-            keep[order[j+i+1]] = False
+        for j, ov in enumerate(ovps):
+            if ov > threshold:
+                keep[order[j+i+1]] = False
     return keep

@@ -84,7 +84,14 @@ class SmallNet(ObjectDetectionNet):
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
 
-        up1 = upsampling(inputs, 8, 'up1')
+
+        with variable_scope("input_upsampling"):
+            c = conv(inputs, 8, name='conv1')
+            c = conv(c, 8, name='conv2')
+            c = maxpool(c, name = 'maxpool', padding='SAME')
+
+
+        up1 = upsampling(c, 8, 'up1')
         up2 = upsampling(up1, 16, 'up2')
         up3 = upsampling(up2, 32, 'up3')
         up4 = upsampling(up3, 64, 'up4')
@@ -96,18 +103,7 @@ class SmallNet(ObjectDetectionNet):
         dw3 = lateral_connection(dw3, up3, 64, 'tdm3')
         dw2 = downsampling(dw3, 32, 'd2')
         dw2 = lateral_connection(dw2, up2, 32, 'tdm2')
+        dw1 = downsampling(dw2, 32, 'd1')
+        dw1 = lateral_connection(dw1, up1, 32, 'tdm1')
 
-        self.featuremap = conv(dw2, self.K*(self.n_classes + 4 + 1), name='featuremap')
-
-
-
-
-
-
-
-
-
-
-
-
-
+        self.featuremap = conv(dw1, self.K*(self.n_classes + 4 + 1), name='featuremap')
