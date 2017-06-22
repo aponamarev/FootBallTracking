@@ -131,6 +131,7 @@ class ObjectDetectionNet(NetTemplate):
         K = self.K
         KC = self.K * self.n_classes
         WHK = self.WHK
+        ɛ = self.EPSILON
 
         with variable_scope('classes'):
             # probability
@@ -177,9 +178,9 @@ class ObjectDetectionNet(NetTemplate):
                 center_x = tf.add(x, dx * w, name='cx') #center_x = identity(x + dx * w, name='cx')
                 center_y = tf.add(y, dy * h, name='cy') # center_y = identity(y + dy * h, name='cy')
                 # exponent is used to undo the log used to pack box width and height
-                width = tf.multiply(w, safe_exp(dw, self.EXP_THRESH), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
+                width = tf.multiply(w, safe_exp(dw, ɛ), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
                 # exponent is used to undo the log used to pack box width and height
-                height = tf.multiply(h, safe_exp(dh, self.EXP_THRESH), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
+                height = tf.multiply(h, safe_exp(dh, ɛ), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
 
             with variable_scope('trimming'):
                 '''
@@ -224,7 +225,7 @@ class ObjectDetectionNet(NetTemplate):
 
                     union = w1 * h1 + w2 * h2 - intersection
 
-                self.IoU = tf.multiply(intersection/(union+self.EPSILON), reshape(mask, [-1, self.WHK]), name='IoU')
+                self.IoU = tf.multiply(intersection / (union + ɛ), reshape(mask, [-1, self.WHK]), name='IoU')
 
             with variable_scope('probability'):
 
@@ -273,6 +274,7 @@ class ObjectDetectionNet(NetTemplate):
         tf.summary.scalar("num_objects", reduce_mean(n_obj))
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
+        ɛ = self.EPSILON
 
         # If batch norm is used it is important to add dependency to update UPDATE_OPS before you do loss calc
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -282,8 +284,8 @@ class ObjectDetectionNet(NetTemplate):
                 with variable_scope('P_class'):
                     # cross-entropy: q * -log(p) + (1-q) * -log(1-p)
                     # add a small value into log to prevent blowing up
-                    pos_CE = L * -tf.log(self.P_class + self.EPSILON)
-                    neg_CE = (1-L) * -tf.log(1-self.P_class + self.EPSILON)
+                    pos_CE = L * -tf.log(self.P_class + ɛ)
+                    neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
                     self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj), name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
@@ -351,6 +353,7 @@ class ObjectDetectionNet(NetTemplate):
                                   feed_dict={self.input_img: np.expand_dims(X_batch, 0),
                                              self.is_training: False}))
         return p
+
 
     def filter_prediction(self, boxes, probs, cls_idx, TOP_N_DETECTION=50, PROB_THRESH=0.5, NMS_THRESH=0.2):
         """Filter bounding box predictions with probability threshold and

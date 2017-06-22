@@ -28,15 +28,15 @@ coco_labels=[1, 2, 3, 4]
 learning_rate = 1e-5
 restore_model = True
 
-batch_sz=32
-queue_capacity = batch_sz * 4
+batch_sz=64
+queue_capacity = batch_sz * 3
 prefetching_threads = 2
 imshape=(512, 512)
 gpu_id = 0
 
 summary_step = 100
 checkpoint_step = 1000
-max_steps = 10**6
+max_steps = 10**5
 
 coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
@@ -51,7 +51,7 @@ def generate_sample(net):
             im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
             looking = False
         except:
-            print("Caught an error in image processing")
+            pass
 
     return [im, bboxes, deltas, mask, labels]
 
