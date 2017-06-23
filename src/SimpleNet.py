@@ -21,7 +21,7 @@ class SimpleNet(ObjectDetectionNet):
     def __init__(self, labels_provided, imshape, lr=1e-3):
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 16), int(imshape[1] / 16))
+        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
 
         super().__init__(labels_provided, lr)
 

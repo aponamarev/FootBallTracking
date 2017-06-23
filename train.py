@@ -15,7 +15,7 @@ from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
-from src.SimpleNet import SimpleNet as Net
+from src.SmallNet import SmallNet as Net
 from src.util import coco_boxes2cxcywh
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
@@ -36,7 +36,7 @@ gpu_id = 0
 
 summary_step = 100
 checkpoint_step = 1000
-max_steps = 10**5
+max_steps = 10**6
 
 coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
@@ -45,9 +45,6 @@ def generate_sample(net):
     while looking:
         try:
             im, labels, bboxes = coco.get_sample()
-
-            bboxes = list(map(lambda b: coco_boxes2cxcywh(im, b), bboxes))
-
             im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
             looking = False
         except:
