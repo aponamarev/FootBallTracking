@@ -21,8 +21,11 @@ Predictions = namedtuple("Predictions", ['bboxes','conf','classes'])
 class ObjectDetectionNet(NetTemplate):
 
 
+    imshape, outshape = None, None
 
-    def __init__(self, labels_provided, imshape, lr,
+
+
+    def __init__(self, labels_provided, lr,
                  anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
         """
         A skeleton of SqueezeDet Net.
@@ -35,15 +38,20 @@ class ObjectDetectionNet(NetTemplate):
         """
         self.lr = lr
 
-        self.featuremap = None
+        try:
+            assert self.imshape is not None, "Error incorrect image input type"
+            assert self.outshape is not None, "Error incorrect output input type"
+        except:
+            assert False, "image size error"
 
-        self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0]/4), int(imshape[1]/4))
+
+
+        self.featuremap = None
         self.labels_available = labels_provided
         self.n_classes = len(labels_provided)
         self.K = len(anchor_shapes)
         self.WHK = self.K * self.outshape.x * self.outshape.y
-        self.anchors = set_anchors(imshape, self.outshape, anchor_shapes)
+        self.anchors = set_anchors(self.imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
         self.LOSS_COEF_BBOX = 5.0 # should be float

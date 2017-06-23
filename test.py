@@ -16,7 +16,7 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
 
-path_to_net = 'logs/t4_no_identity/model.ckpt'
+path_to_net = 'logs/t5/model.ckpt'
 imshape = (512, 512)
 batch_size = 1
 
@@ -90,7 +90,7 @@ def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
             kernel_id = final_cls_idx[box_id]
             label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))
 
-        img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
+        img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label, true_coord=True)
 
     return img
 

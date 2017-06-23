@@ -112,7 +112,8 @@ def check_path(p):
 
     return p
 
-def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FONT_HERSHEY_COMPLEX_SMALL, fontScale=0.75, color=(255, 0, 0)):
+def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FONT_HERSHEY_COMPLEX_SMALL,
+               fontScale=0.75, color=(255, 0, 0), true_coord=False):
     """
     Draws bounding boxes_xmin_ymin_xmax_ymax and labels on an image
     :param img:
@@ -131,8 +132,12 @@ def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FON
 
         xmin, ymin, xmax, ymax = b
 
-        top_left = (int(xmin), int(Y-ymax))
-        bottom_right = (int(xmax), int(Y-ymin))
+        if true_coord:
+            top_left = (int(xmin), int(ymax))
+            bottom_right = (int(xmax), int(ymin))
+        else:
+            top_left = (int(xmin), int(Y-ymax))
+            bottom_right = (int(xmax), int(Y-ymin))
 
         rectangle(img, top_left, bottom_right,color, thickness=thickness)
         (w, h), baseline = getTextSize(l, fontFace, fontScale, max(1, int(thickness / 2)))

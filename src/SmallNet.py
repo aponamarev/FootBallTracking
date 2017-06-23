@@ -9,15 +9,21 @@ __email__ = "alex.ponamaryov@gmail.com"
 
 
 import tensorflow as tf
+from collections import namedtuple
 from tensorflow import name_scope, variable_scope, stop_gradient
 
 from .ObjectDetection import ObjectDetectionNet
+
+Point = namedtuple('Point',['x', 'y'])
 
 class SmallNet(ObjectDetectionNet):
 
     def __init__(self, labels_provided, imshape, lr=1e-3):
 
-        super().__init__(labels_provided, imshape, lr)
+        self.imshape = Point(*imshape)
+        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
+
+        super().__init__(labels_provided, lr)
 
     def _add_featuremap(self):
 
@@ -34,7 +40,7 @@ class SmallNet(ObjectDetectionNet):
             with variable_scope('upsampling_' + name):
                 input = bn(input, name=name)
                 with variable_scope('tower1'):
-                    t1 = conv(input, filters, name='conv1')
+                    t1 = conv(input, max(16, int(filters/4)), name='conv1')
                     t1 = conv(t1, filters, name='conv2')
                     t1 = bn(t1, name='batch_norm')
                     t1 = conv(t1, filters, name='conv3')
@@ -42,7 +48,7 @@ class SmallNet(ObjectDetectionNet):
                     t1 = maxpool(t1, name='maxpool', padding='SAME')
 
                 with variable_scope('tower2'):
-                    t2 = conv(input, filters, name='conv1')
+                    t2 = conv(input, max(16, int(filters/4)), name='conv1')
                     t2 = conv(t2, filters, name='conv2')
                     t2 = maxpool(t2, name='maxpool', padding='SAME')
 
@@ -87,23 +93,23 @@ class SmallNet(ObjectDetectionNet):
 
         with variable_scope("input_upsampling"):
             c = conv(inputs, 8, name='conv1')
-            c = conv(c, 8, name='conv2')
+            c = conv(c, 32, name='conv2', strides=(2,2), padding='SAME')
             c = maxpool(c, name = 'maxpool', padding='SAME')
 
 
-        up1 = upsampling(c, 8, 'up1')
-        up2 = upsampling(up1, 16, 'up2')
-        up3 = upsampling(up2, 32, 'up3')
-        up4 = upsampling(up3, 64, 'up4')
-        up5 = upsampling(up4, 64, 'up5')
+        up1 = upsampling(c, 32, 'up1')
+        up2 = upsampling(up1, 64, 'up2')
+        up3 = upsampling(up2, 64, 'up3')
+        up4 = upsampling(up3, 128, 'up4')
+        up5 = upsampling(up4, 256, 'up5')
 
-        dw4 = downsampling(up5, 64, 'd4')
-        dw4 = lateral_connection(dw4, up4, 64, 'tdm4')
-        dw3 = downsampling(dw4, 32, 'd3')
+        dw4 = downsampling(up5, 256, 'd4')
+        dw4 = lateral_connection(dw4, up4, 128, 'tdm4')
+        dw3 = downsampling(dw4, 64, 'd3')
         dw3 = lateral_connection(dw3, up3, 64, 'tdm3')
-        dw2 = downsampling(dw3, 32, 'd2')
-        dw2 = lateral_connection(dw2, up2, 32, 'tdm2')
-        dw1 = downsampling(dw2, 32, 'd1')
-        dw1 = lateral_connection(dw1, up1, 32, 'tdm1')
+        dw2 = downsampling(dw3, 64, 'd2')
+        dw2 = lateral_connection(dw2, up2, 64, 'tdm2')
+        dw1 = downsampling(dw2, 64, 'd1')
+        dw1 = lateral_connection(dw1, up1, 64, 'tdm1')
 
         self.featuremap = conv(dw1, self.K*(self.n_classes + 4 + 1), name='featuremap')
