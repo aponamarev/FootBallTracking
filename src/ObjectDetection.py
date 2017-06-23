@@ -290,11 +290,13 @@ class ObjectDetectionNet(NetTemplate):
 
             with variable_scope('Loss'):
                 with variable_scope('P_class'):
+
                     # cross-entropy: q * -log(p) + (1-q) * -log(1-p)
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + ɛ)
                     neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
-                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj), name='loss')
+                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE + neg_CE) * mask * W_ce), n_obj), name='loss')
+                    #self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj), name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 
@@ -302,12 +304,10 @@ class ObjectDetectionNet(NetTemplate):
 
                     anchor_mask = reshape(mask, [-1, WHK])
 
-                    conf_pos = truediv(reduce_sum(tf.square(self.IoU - self.anchor_confidence) * anchor_mask,1,
-                                                  keep_dims=True), n_obj)
-                    conf_neg = truediv(reduce_sum(tf.square((1 - anchor_mask) * self.anchor_confidence),1,
-                                                  keep_dims=True), WHK - n_obj)
+                    conf_pos = tf.square(self.IoU - self.anchor_confidence)
+                    norm = (anchor_mask * W_pos / n_obj + (1-anchor_mask)*W_neg*(WHK - n_obj))
 
-                    self.conf_loss = reduce_mean(W_pos * conf_pos + W_neg * conf_neg, name='loss')
+                    self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
 
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
 
