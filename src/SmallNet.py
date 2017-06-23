@@ -94,7 +94,6 @@ class SmallNet(ObjectDetectionNet):
         with variable_scope("input_upsampling"):
             c = conv(inputs, 8, name='conv1')
             c = conv(c, 32, name='conv2', strides=(2,2), padding='SAME')
-            c = maxpool(c, name = 'maxpool', padding='SAME')
 
 
         up1 = upsampling(c, 32, 'up1')
@@ -109,7 +108,5 @@ class SmallNet(ObjectDetectionNet):
         dw3 = lateral_connection(dw3, up3, 64, 'tdm3')
         dw2 = downsampling(dw3, 64, 'd2')
         dw2 = lateral_connection(dw2, up2, 64, 'tdm2')
-        dw1 = downsampling(dw2, 64, 'd1')
-        dw1 = lateral_connection(dw1, up1, 64, 'tdm1')
 
-        self.featuremap = conv(dw1, self.K*(self.n_classes + 4 + 1), name='featuremap')
+        self.featuremap = conv(dw2, self.K*(self.n_classes + 4 + 1), name='featuremap')
