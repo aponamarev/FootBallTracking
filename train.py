@@ -15,7 +15,7 @@ from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
-from src.SmallNet import SmallNet
+from src.SimpleNet import SimpleNet as Net
 from src.util import coco_boxes2cxcywh
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
@@ -69,7 +69,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, imshape, learning_rate)
+            net = Net(coco_labels, imshape, learning_rate)
 
             # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
