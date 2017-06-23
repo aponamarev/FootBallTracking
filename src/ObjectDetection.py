@@ -186,9 +186,9 @@ class ObjectDetectionNet(NetTemplate):
                 center_x = tf.add(x, dx * w, name='cx') #center_x = identity(x + dx * w, name='cx')
                 center_y = tf.add(y, dy * h, name='cy') # center_y = identity(y + dy * h, name='cy')
                 # exponent is used to undo the log used to pack box width and height
-                width = tf.multiply(w, safe_exp(dw, ɛ), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
+                width = tf.multiply(w, safe_exp(dw, self.EXP_THRESH), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
                 # exponent is used to undo the log used to pack box width and height
-                height = tf.multiply(h, safe_exp(dh, ɛ), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
+                height = tf.multiply(h, safe_exp(dh, self.EXP_THRESH), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
 
             with variable_scope('trimming'):
                 '''
@@ -278,8 +278,8 @@ class ObjectDetectionNet(NetTemplate):
         W_ce = self.LOSS_COEF_CLASS # weight of cross entropy  loss (P(class))
         W_pos = self.LOSS_COEF_CONF_POS # weight of confidence loss in positive examples
         W_neg = self.LOSS_COEF_CONF_NEG # weight of confidence loss in negative examples
-        n_obj = reduce_sum(mask, 1) # number of target objects in an image - used to normalize loss
-        tf.summary.scalar("num_objects", reduce_mean(n_obj))
+        n_obj = reduce_sum(mask) # number of target objects in an image - used to normalize loss
+        tf.summary.scalar("num_objects", n_obj)
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
         ɛ = self.EPSILON
@@ -295,7 +295,7 @@ class ObjectDetectionNet(NetTemplate):
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + ɛ)
                     neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
-                    self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE + neg_CE) * mask * W_ce), n_obj), name='loss')
+                    self.P_loss = truediv(reduce_sum((pos_CE + neg_CE) * mask * W_ce), n_obj, name='loss')
                     #self.P_loss = reduce_mean(truediv(reduce_sum((pos_CE+neg_CE) * mask, 1) * W_ce, n_obj), name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
