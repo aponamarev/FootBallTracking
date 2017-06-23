@@ -15,20 +15,20 @@ from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
-from src.SmallNet import SmallNet
+from src.SimpleNet import SimpleNet as Net
 from src.util import coco_boxes2cxcywh
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
 PATH2IMAGES = 'dataset/coco/images/train2014'
-train_dir = 'logs/t5/'
+train_dir = 'logs/Simple1/'
 
 coco_labels=[1, 2, 3, 4]
 
 learning_rate = 1e-4
 restore_model = False
 
-batch_sz=64
+batch_sz=32
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
 imshape=(512, 512)
@@ -69,7 +69,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, imshape, learning_rate)
+            net = Net(coco_labels, imshape, learning_rate)
 
             # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
