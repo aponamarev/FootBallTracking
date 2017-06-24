@@ -18,7 +18,9 @@ Point = namedtuple('Point',['x', 'y'])
 
 class SmallNet(ObjectDetectionNet):
 
-    def __init__(self, labels_provided, imshape, lr=1e-3):
+    def __init__(self, labels_provided, imshape, lr=1e-3, width=1.0):
+
+        self.width=width
 
         self.imshape = Point(*imshape)
         self.outshape = Point(int(imshape[0] / 4), int(imshape[1] / 4))
@@ -92,16 +94,16 @@ class SmallNet(ObjectDetectionNet):
             c = separable_conv(c, 32, name='conv2', strides=2)
 
 
-        up1 = upsampling(c, 64, 'up1')
-        up2 = upsampling(up1, 128, 'up2')
-        up3 = upsampling(up2, 256, 'up3')
-        up4 = upsampling(up3, 256, 'up4')
+        up1 = upsampling(c, int(64*self.width), 'up1')
+        up2 = upsampling(up1, int(128*self.width), 'up2')
+        up3 = upsampling(up2, int(256*self.width), 'up3')
+        up4 = upsampling(up3, int(256*self.width), 'up4')
 
-        dw3 = downsampling(up4, 256, 'd3')
-        dw3 = lateral_connection(dw3, up3, 256, 'tdm3')
-        dw2 = downsampling(dw3, 128, 'd2')
-        dw2 = lateral_connection(dw2, up2, 128, 'tdm2')
-        dw1 = downsampling(dw2, 64, 'd1')
-        dw1 = lateral_connection(dw1, up1, 64, 'tdm1')
+        dw3 = downsampling(up4, int(256*self.width), 'd3')
+        dw3 = lateral_connection(dw3, up3, int(256*self.width), 'tdm3')
+        dw2 = downsampling(dw3, int(128*self.width), 'd2')
+        dw2 = lateral_connection(dw2, up2, int(128*self.width), 'tdm2')
+        dw1 = downsampling(dw2, int(64*self.width), 'd1')
+        dw1 = lateral_connection(dw1, up1, int(64*self.width), 'tdm1')
 
         self.feature_map = separable_conv(dw1, self.K * (self.n_classes + 4 + 1), name='feature_map')

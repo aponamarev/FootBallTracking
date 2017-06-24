@@ -67,13 +67,10 @@ class NetTemplate(object):
         """
         with tf.variable_scope(name):
 
-            conv=inputs
-
-            if BN_FLAG:
-                conv = batch_norm(conv, scope='depthwise_batch_norm')
-
-            conv = conv2d(inputs=conv, num_outputs=filters, activation_fn=tf.nn.elu,
+            conv = conv2d(inputs=inputs, num_outputs=filters, activation_fn=tf.nn.elu,
                           kernel_size=kernel_size, stride=strides,padding=padding, scope=name)
+            if BN_FLAG:
+                conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
 
         return conv
 
@@ -95,7 +92,7 @@ class NetTemplate(object):
                                     scope='depthwise_conv')
 
             if BN_FLAG:
-                conv = batch_norm(conv, scope='depthwise_batch_norm')
+                conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
 
             conv = conv2d(inputs=conv,
                           num_outputs=filters,
@@ -104,7 +101,7 @@ class NetTemplate(object):
                           scope='pointwise_conv')
 
             if BN_FLAG:
-                conv = batch_norm(conv, scope='pointwise_batch_norm')
+                conv = batch_norm(conv, is_training=self.is_training, scope='pointwise_batch_norm')
 
         return conv
 
