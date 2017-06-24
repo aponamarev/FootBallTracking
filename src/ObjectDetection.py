@@ -6,13 +6,14 @@ Created 6/13/17.
 __author__ = "Alexander Ponamarev"
 __email__ = "alex.ponamaryov@gmail.com"
 
+from matplotlib import pyplot as plt
 from collections import namedtuple
 import tensorflow as tf
 import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
     unstack, identity, stack, truediv
-from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, resize_wo_scale_dist,\
-    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, coco_boxes2xmin_ymin_xmax_ymax, convertToFixedSize, sparse_to_dense, nms
+from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, resize_wo_scale_dist, draw_boxes,\
+    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, cxcywh_xmin_ymin_xmax_ymax, convertToFixedSize, sparse_to_dense, nms
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
@@ -412,6 +413,9 @@ class ObjectDetectionNet(NetTemplate):
         # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
         bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
         labels = list(map(lambda x: self.labels_available.index(x), labels))
+
+        im1 = draw_boxes(im, list(map(cxcywh_xmin_ymin_xmax_ymax, bboxes)), labels, true_coord=True)
+        plt.imshow(im1/255-0.5)
 
         # 3. Find mask (anchor ids)
         aids = find_anchor_ids(bboxes, self.anchors)

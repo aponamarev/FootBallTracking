@@ -18,16 +18,16 @@ Point = namedtuple('Point',['x', 'y'])
 
 class SimpleNet(ObjectDetectionNet):
 
-    def __init__(self, labels_provided, imshape, lr=1e-3):
+    def __init__(self, labels_provided, imshape, lr=1e-3, width=1.0):
 
+        self.width = width
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
+        self.outshape = Point(int(imshape[0] / 64), int(imshape[1] / 64))
 
         super().__init__(labels_provided, lr)
 
     def _add_featuremap(self):
-
-
+        separable_conv = self._separable_conv2d
         conv = self._conv2d
         deconv = self._deconv
         concat = self._concat
@@ -35,54 +35,40 @@ class SimpleNet(ObjectDetectionNet):
         bn = self._batch_norm
         fc = self._fullyconnected
 
-        def conv_block(input, filters, name, upsampling=True):
-
+        def upsampling(input, filters, name):
             with variable_scope('upsampling_' + name):
-                input = bn(input, name=name)
                 with variable_scope('tower1'):
-                    t1 = conv(input, max(16, int(filters/4)), name='conv1')
-                    t1 = conv(t1, filters, name='conv2')
-                    t1 = bn(t1, name='batch_norm')
-                    t1 = conv(t1, filters, name='conv3')
-                    t1 = conv(t1, filters, name='conv4')
-                    if upsampling:
-                        t1 = maxpool(t1, name='maxpool', padding='SAME')
+                    t1 = separable_conv(input, filters, name='conv1')
+                    t1 = separable_conv(t1, filters, name='conv2')
+                    t1 = separable_conv(t1, filters, name='conv3')
+                    t1 = separable_conv(t1, filters, strides=2, name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = conv(input, max(16, int(filters/4)), name='conv1')
-                    t2 = conv(t2, filters, name='conv2')
-                    if upsampling:
-                        t2 = maxpool(t2, name='maxpool', padding='SAME')
+                    t2 = separable_conv(input, filters, name='conv1')
+                    t2 = separable_conv(t2, filters, strides=2, name='conv2')
 
                 with variable_scope('tower3'):
-                    t3 = conv(input, filters, bias=False, name='regularization')
-                    if upsampling:
-                        t3 = maxpool(t3, name='maxpool', padding='SAME')
+                    t3 = separable_conv(input, filters, strides=2, name='regularization')
 
                 c = concat([t1, t2, t3], axis=3, name='concat')
-                c = conv(c, filters, name="output")
+                c = separable_conv(c, filters, name="output")
 
             return c
 
         def downsampling(input, filters, name):
-
             with variable_scope('downsampling_' + name):
                 input = bn(input, name='batch_norm')
-                d = deconv(input, filters, [3,3], [2,2], padding='SAME')
-                d = conv(d, filters, name='output')
+                d = deconv(input, filters, [3, 3], [2, 2], padding='SAME')
+                d = separable_conv(d, filters, name='output')
 
             return d
 
         def lateral_connection(td, dt, filters, name):
-
-            with variable_scope('lateral_'+name):
+            with variable_scope('lateral_' + name):
                 dt = stop_gradient(dt, name="stop_G")
-                l = conv(dt, filters, name="L")
+                l = separable_conv(dt, filters, name="L")
                 output = concat((td, l))
-                return conv(output, filters, name="force_choice")
-
-
-
+                return separable_conv(output, filters, name="force_choice")
 
         inputs = self.input_img
 
@@ -91,17 +77,14 @@ class SimpleNet(ObjectDetectionNet):
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
 
-
         with variable_scope("input_upsampling"):
-            c = conv(inputs, 8, name='conv1')
-            c = conv(c, 32, name='conv2', strides=(2,2), padding='SAME')
-            c = maxpool(c, name = 'maxpool', padding='SAME')
+            c = conv(inputs, 8, name='conv1', strides=2)
+            c = separable_conv(c, 32, name='conv2')
 
+        up1 = upsampling(c, int(64 * self.width), 'up1')
+        up2 = upsampling(up1, int(128 * self.width), 'up2')
+        up3 = upsampling(up2, int(256 * self.width), 'up3')
+        up4 = upsampling(up3, int(256 * self.width), 'up4')
+        up5 = upsampling(up4, int(512 * self.width), 'up5')
 
-        up1 = conv_block(c, 32, 'up1')
-        up2 = conv_block(up1, 64, 'up2', upsampling=False)
-        up3 = conv_block(up2, 64, 'up3')
-        up4 = conv_block(up3, 128, 'up4')
-        up5 = conv_block(up4, 256, 'up5', upsampling=False)
-
-        self.featuremap = conv(up5, self.K*(self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(up5, self.K*(self.n_classes + 4 + 1), name='feature_map')

@@ -332,17 +332,17 @@ def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
         label_counter += 1
         # To keep a track of added label/ANCHOR_BOX create a list of ANCHOR_BOX
         # (for each image [i]) corresponding to objects
-        ojb_anchor_id = aidx[lbl_num]
+        obj_anchor_id = aidx[lbl_num]
         obj_label = labels[lbl_num]
         box_deltas = boxes_deltas[lbl_num]
         box_xyhw = cxcywh_xmin_ymin_xmax_ymax(bboxes[lbl_num])
-        if (ojb_anchor_id) not in aidx_set:
-            aidx_set.add(ojb_anchor_id)
+        if (obj_anchor_id) not in aidx_set:
+            aidx_set.add(obj_anchor_id)
             # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
-            label_indices.append([ojb_anchor_id, obj_label])
-            mask_indices.append([ojb_anchor_id])
+            label_indices.append([obj_anchor_id, obj_label])
+            mask_indices.append([obj_anchor_id])
             # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
-            bbox_indices.extend([[ojb_anchor_id, xywh] for xywh in range(4)])
+            bbox_indices.extend([[obj_anchor_id, xywh] for xywh in range(4)])
             box_delta_values.extend(box_deltas)
             box_values.extend(box_xyhw)
         else:
@@ -448,7 +448,7 @@ def nms(boxes, probs, threshold):
 def map_deltas(a, d):
     dx, dy, dw, dh = d
     x,y,w,h = a
-    cx = x+dx * w
+    cx = x + dx * w
     cy = y + dy * h
     width = w * np.exp(dw)
     height = w * np.exp(dh)
