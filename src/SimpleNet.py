@@ -106,4 +106,4 @@ class SimpleNet(ObjectDetectionNet):
         up4 = conv_block(up3, 128, 'up4')
         up5 = conv_block(up4, 256, 'up5', upsampling=False)
 
-        self.featuremap = conv(up5, self.K*(self.n_classes + 4 + 1), name='featuremap')
+        self.featuremap = conv(up5, self.K*(self.n_classes + 4 + 1), name='feature_map')

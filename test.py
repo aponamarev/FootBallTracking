@@ -60,13 +60,13 @@ def main():
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
 
-    var_to_recover = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+    var_to_recover = graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
     saver = tf.train.Saver(var_to_recover, reshape=True)
     saver.restore(sess, path_to_net)
 
     for p in img_list:
         im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
-        im = process(im, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50)
+        im = process(im, net, sess, threshold=0.5, NMS_THRESH=0.3, max_obj=50)
         imshow(im)
 
 
@@ -90,7 +90,8 @@ def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
             kernel_id = final_cls_idx[box_id]
             label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))
 
-        img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
+        #img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
+        img = draw_boxes(img, final_boxes, label)
 
     return img
 
