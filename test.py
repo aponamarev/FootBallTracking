@@ -15,7 +15,7 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
 
-path_to_net = 'logs/t5/model.ckpt'
+path_to_net = 'logs 2/t5/model.ckpt'
 imshape = (320, 320)
 batch_size = 1
 

@@ -16,6 +16,7 @@ from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet as Net
+from src.util import draw_boxes, cxcywh_xmin_ymin_xmax_ymax, map_deltas
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
@@ -25,7 +26,7 @@ train_dir = 'logs/t5'
 coco_labels=[1, 2, 3, 4]
 
 learning_rate = 1e-3
-restore_model = False
+restore_model = True
 
 batch_sz=24
 queue_capacity = batch_sz * 4
@@ -88,6 +89,8 @@ def train():
             dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
                                         shapes=shapes, name="Batch_{}_samples".format(batch_sz), num_threads=prefetching_threads)
             net.setup_inputs(*dequeue_op)
+
+            img_viz = tf.summary.image("Input imgs", net.input_img, max_outputs=8)
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
@@ -157,7 +160,8 @@ def train():
             _, loss_value, conf_loss, bbox_loss, class_loss = \
                 sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
                          feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
-            pbar.set_postfix(conf_loss="{:.2f}".format(conf_loss),
+            pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
+                             class_loss="{:.1f}%".format(class_loss*100),
                              total_loss="{:.2f}".format(loss_value))
 
         assert not np.isnan(loss_value), \
@@ -165,14 +169,17 @@ def train():
             'class_loss: {}'.format(loss_value, conf_loss, bbox_loss, class_loss)
 
         # Save the model checkpoint periodically.
-        if step % checkpoint_step == 0 or (step + 1) == max_steps-1:
-            #viz_summary = sess.run(net.viz_op)
+        if step % checkpoint_step == checkpoint_step-1 or step == max_steps:
             summary_writer.add_summary(summary_str, step)
-            #summary_writer.add_summary(viz_summary, step)
             checkpoint_path = join(train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path)
 
-        #threads = [threading.Thread(target=enqueue_thread, args=(coord,)).start() for i in range(prefetching_threads)]
+            ################
+            ### Debuggin ###
+            ################
+
+            viz_summary = sess.run(img_viz, feed_dict={net.input_img: dgb_viz(net, sess, dequeue_op)})
+            summary_writer.add_summary(viz_summary, step)
 
         # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.
     sess.run(queue.close(cancel_pending_enqueues=True))
@@ -180,6 +187,30 @@ def train():
     # Tell coordinator to stop any queries to the threads
     coord.join(threads)
     sess.close()
+
+def dgb_viz(net, sess,  inputs):
+    im, bboxes, deltas, mask, labels = sess.run(inputs)
+    anchors = net.anchors
+
+    for i in range(im.shape[0]):
+
+        a_ids = mask[i].nonzero()
+        final_bboxes = []
+        final_lables = []
+        final_anchors = []
+        final_deltas = []
+        for a_id in a_ids[0]:
+            final_bboxes.append(bboxes[i][a_id])
+            final_lables.append(CLASSES[np.argmax(labels[i][a_id])])
+            final_anchors.append(anchors[a_id])
+            final_deltas.append(deltas[i][a_id])
+
+        im[i] = draw_boxes(im[i],
+                           list(map(cxcywh_xmin_ymin_xmax_ymax, final_bboxes)), final_lables,
+                           color=(0, 255, 0))
+        im[i] = draw_boxes(im[i], [map_deltas(a,d) for a,d in zip(final_anchors, final_deltas)], final_lables)
+
+    return im
 
 
 if __name__=='__main__':

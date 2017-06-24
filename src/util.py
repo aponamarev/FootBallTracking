@@ -214,7 +214,7 @@ def resize_wo_scale_dist(img, shape):
     W, H = shape
     h,w,c = img.shape
 
-    mask = np.zeros((H,W,c), dtype=np.uint8)
+    mask = np.zeros((H,W,c)).astype(img.dtype)
 
     if h<w:
         scale = W / w
@@ -443,3 +443,14 @@ def nms(boxes, probs, threshold):
             if ov > threshold:
                 keep[order[j+i+1]] = False
     return keep
+
+
+def map_deltas(a, d):
+    dx, dy, dw, dh = d
+    x,y,w,h = a
+    cx = x+dx * w
+    cy = y + dy * h
+    width = w * np.exp(dw)
+    height = w * np.exp(dh)
+
+    return cxcywh_xmin_ymin_xmax_ymax((cx,cy,width, height))

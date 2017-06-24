@@ -88,8 +88,6 @@ class SimpleNet(ObjectDetectionNet):
 
         with name_scope('inputs'):
 
-            tf.summary.image("imgs", inputs, max_outputs=2)
-
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
 

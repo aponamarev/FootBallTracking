@@ -52,8 +52,8 @@ class ObjectDetectionNet(NetTemplate):
         self.anchors = set_anchors(self.imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
-        self.LOSS_COEF_BBOX = 5.0 # should be float
-        self.LOSS_COEF_CLASS = 1.0 # should be float
+        self.LOSS_COEF_BBOX = 1.0 # should be float
+        self.LOSS_COEF_CLASS = 10.0 # should be float
         self.LOSS_COEF_CONF_POS = 75.0 # should be float
         self.LOSS_COEF_CONF_NEG = 100.0 # should be float
         self.input_img = None
@@ -289,7 +289,7 @@ class ObjectDetectionNet(NetTemplate):
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + ɛ)
                     neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
-                    self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask), n_obj, name='loss')
+                    self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask)/self.n_classes, n_obj, name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 
@@ -308,7 +308,7 @@ class ObjectDetectionNet(NetTemplate):
 
                     all_deltas = self.detected_box_deltas - self.input_box_delta
                     pos_deltas = all_deltas * mask
-                    norm_deltas = reduce_sum(W_bbox * tf.square(pos_deltas))
+                    norm_deltas = reduce_sum(tf.square(pos_deltas))
                     norm_deltas = truediv(norm_deltas, n_obj)
 
                     self.bbox_loss = tf.multiply(W_bbox, norm_deltas, name='loss')
@@ -423,7 +423,8 @@ class ObjectDetectionNet(NetTemplate):
 
         dense = self._map_to_grid(labels, bboxes, aids, deltas)
 
-        return im, dense['dense_labels'], dense['masks'], dense['bbox_deltas'], dense['bbox_values']
+        return im.astype(np.float32), dense['dense_labels'], dense['masks'], dense['bbox_deltas'], dense['bbox_values']
+
 
 
 
