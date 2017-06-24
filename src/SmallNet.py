@@ -21,13 +21,14 @@ class SmallNet(ObjectDetectionNet):
     def __init__(self, labels_provided, imshape, lr=1e-3):
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
+        self.outshape = Point(int(imshape[0] / 4), int(imshape[1] / 4))
 
         super().__init__(labels_provided, lr)
 
     def _add_featuremap(self):
 
 
+        separable_conv = self._separable_conv2d
         conv = self._conv2d
         deconv = self._deconv
         concat = self._concat
@@ -38,26 +39,21 @@ class SmallNet(ObjectDetectionNet):
         def upsampling(input, filters, name):
 
             with variable_scope('upsampling_' + name):
-                input = bn(input, name=name)
                 with variable_scope('tower1'):
-                    t1 = conv(input, max(16, int(filters/4)), name='conv1')
-                    t1 = conv(t1, filters, name='conv2')
-                    t1 = bn(t1, name='batch_norm')
-                    t1 = conv(t1, filters, name='conv3')
-                    t1 = conv(t1, filters, name='conv4')
-                    t1 = maxpool(t1, name='maxpool', padding='SAME')
+                    t1 = separable_conv(input, max(16, int(filters/4)), name='conv1')
+                    t1 = separable_conv(t1, filters, name='conv2')
+                    t1 = separable_conv(t1, filters, name='conv3')
+                    t1 = separable_conv(t1, filters, strides=2, name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = conv(input, max(16, int(filters/4)), name='conv1')
-                    t2 = conv(t2, filters, name='conv2')
-                    t2 = maxpool(t2, name='maxpool', padding='SAME')
+                    t2 = separable_conv(input, max(16, int(filters/4)), name='conv1')
+                    t2 = separable_conv(t2, filters, strides=2, name='conv2')
 
                 with variable_scope('tower3'):
-                    t3 = conv(input, filters, bias=False, name='regularization')
-                    t3 = maxpool(t3, name='maxpool', padding='SAME')
+                    t3 = separable_conv(input, filters, strides=2, name='regularization')
 
                 c = concat([t1, t2, t3], axis=3, name='concat')
-                c = conv(c, filters, name="output")
+                c = separable_conv(c, filters, name="output")
 
             return c
 
@@ -66,7 +62,7 @@ class SmallNet(ObjectDetectionNet):
             with variable_scope('downsampling_' + name):
                 input = bn(input, name='batch_norm')
                 d = deconv(input, filters, [3,3], [2,2], padding='SAME')
-                d = conv(d, filters, name='output')
+                d = separable_conv(d, filters, name='output')
 
             return d
 
@@ -74,9 +70,9 @@ class SmallNet(ObjectDetectionNet):
 
             with variable_scope('lateral_'+name):
                 dt = stop_gradient(dt, name="stop_G")
-                l = conv(dt, filters, name="L")
+                l = separable_conv(dt, filters, name="L")
                 output = concat((td, l))
-                return conv(output, filters, name="force_choice")
+                return separable_conv(output, filters, name="force_choice")
 
 
 
@@ -92,24 +88,20 @@ class SmallNet(ObjectDetectionNet):
 
 
         with variable_scope("input_upsampling"):
-            c = conv(inputs, 8, name='conv1')
-            c = conv(c, 32, name='conv2', strides=(2,2), padding='SAME')
-            c = maxpool(c, name = 'maxpool', padding='SAME')
+            c = conv(inputs, 8, BN_FLAG=False, name='conv1')
+            c = separable_conv(c, 32, name='conv2', strides=2)
 
 
-        up1 = upsampling(c, 32, 'up1')
-        up2 = upsampling(up1, 64, 'up2')
-        up3 = upsampling(up2, 64, 'up3')
-        up4 = upsampling(up3, 128, 'up4')
-        up5 = upsampling(up4, 256, 'up5')
+        up1 = upsampling(c, 64, 'up1')
+        up2 = upsampling(up1, 128, 'up2')
+        up3 = upsampling(up2, 256, 'up3')
+        up4 = upsampling(up3, 256, 'up4')
 
-        dw4 = downsampling(up5, 256, 'd4')
-        dw4 = lateral_connection(dw4, up4, 128, 'tdm4')
-        dw3 = downsampling(dw4, 64, 'd3')
-        dw3 = lateral_connection(dw3, up3, 64, 'tdm3')
-        dw2 = downsampling(dw3, 64, 'd2')
-        dw2 = lateral_connection(dw2, up2, 64, 'tdm2')
+        dw3 = downsampling(up4, 256, 'd3')
+        dw3 = lateral_connection(dw3, up3, 256, 'tdm3')
+        dw2 = downsampling(dw3, 128, 'd2')
+        dw2 = lateral_connection(dw2, up2, 128, 'tdm2')
         dw1 = downsampling(dw2, 64, 'd1')
         dw1 = lateral_connection(dw1, up1, 64, 'tdm1')
 
-        self.feature_map = conv(dw1, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(dw1, self.K * (self.n_classes + 4 + 1), name='feature_map')

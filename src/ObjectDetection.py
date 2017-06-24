@@ -327,7 +327,7 @@ class ObjectDetectionNet(NetTemplate):
         self.train_op = opt.minimize(self.loss)
         tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
 
-        for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
             tf.summary.histogram(var.op.name, var)
 
 

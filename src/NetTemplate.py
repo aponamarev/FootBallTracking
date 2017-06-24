@@ -1,6 +1,7 @@
 	# Author: Alexander Ponamarev (alex.ponamaryov@gmail.com) 04/30/2017
 import tensorflow as tf
 from tensorflow.contrib.layers import xavier_initializer, batch_norm
+from tensorflow.contrib.layers import separable_conv2d, conv2d
 from tensorflow import concat
 import numpy as np
 
@@ -58,18 +59,52 @@ class NetTemplate(object):
         raise NotImplementedError("Loss estimate was not defined!")
 
 
-    def _conv2d(self, inputs, filters, kernel_size=3, strides=[1,1], padding="SAME",name="conv2d", bias=True):
+    def _conv2d(self, inputs, filters, kernel_size=3, strides=[1,1],
+                padding="SAME",name="conv2d", bias=True, BN_FLAG=True):
         """
         kernel_size: An integer or tuple/list of 2 integers, specifying the width and height of the 2D convolution window.
         Can be a single integer to specify the same value for all spatial dimensions.
         """
         with tf.variable_scope(name):
 
-            conv = tf.layers.conv2d(inputs, filters, kernel_size, strides, padding,
-                                    use_bias=bias, kernel_initializer=xavier_initializer())
+            conv=inputs
 
+            if BN_FLAG:
+                conv = batch_norm(conv, scope='depthwise_batch_norm')
 
-            conv = self._activation(conv)
+            conv = conv2d(inputs=conv, num_outputs=filters, activation_fn=tf.nn.elu,
+                          kernel_size=kernel_size, stride=strides,padding=padding, scope=name)
+
+        return conv
+
+    def _separable_conv2d(self, inputs, filters, kernel_size=3, strides=1,
+                          padding="SAME", name="conv2d", BN_FLAG=True):
+        """
+        kernel_size: An integer or tuple/list of 2 integers, specifying the width and height of the 2D convolution window.
+        Can be a single integer to specify the same value for all spatial dimensions.
+        """
+        with tf.variable_scope(name):
+
+            conv = separable_conv2d(inputs=inputs,
+                                    num_outputs=None,
+                                    stride=strides,
+                                    activation_fn=tf.nn.elu,
+                                    kernel_size=[kernel_size, kernel_size],
+                                    depth_multiplier=1,
+                                    padding=padding,
+                                    scope='depthwise_conv')
+
+            if BN_FLAG:
+                conv = batch_norm(conv, scope='depthwise_batch_norm')
+
+            conv = conv2d(inputs=conv,
+                          num_outputs=filters,
+                          activation_fn=tf.nn.elu,
+                          kernel_size=[1,1],
+                          scope='pointwise_conv')
+
+            if BN_FLAG:
+                conv = batch_norm(conv, scope='pointwise_batch_norm')
 
         return conv
 
@@ -77,7 +112,7 @@ class NetTemplate(object):
     def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True):
 
         with tf.variable_scope(name):
-            conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding,
+            conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding, activation=tf.nn.elu,
                                               use_bias=bias, kernel_initializer=xavier_initializer(), name="deconv")
             conv = self._activation(conv)
 
