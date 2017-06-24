@@ -234,7 +234,7 @@ def resize_wo_scale_dist(img, shape):
 def find_anchor_ids(bboxes, anchors):
     """
     Identifies anchor ids_per_img responsible for object detection
-    :param bboxes:
+    :param bboxes: 2D array of [cx, cy, width, height]
     :return: anchor ids_per_img
     """
     ids_per_img = []
@@ -335,7 +335,7 @@ def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
         ojb_anchor_id = aidx[lbl_num]
         obj_label = labels[lbl_num]
         box_deltas = boxes_deltas[lbl_num]
-        box_xyhw = bboxes[lbl_num]
+        box_xyhw = cxcywh_xmin_ymin_xmax_ymax(bboxes[lbl_num])
         if (ojb_anchor_id) not in aidx_set:
             aidx_set.add(ojb_anchor_id)
             # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]

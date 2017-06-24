@@ -90,8 +90,8 @@ class SmallNet(ObjectDetectionNet):
 
 
         with variable_scope("input_upsampling"):
-            c = conv(inputs, 8, BN_FLAG=False, name='conv1')
-            c = separable_conv(c, 32, name='conv2', strides=2)
+            c = conv(inputs, 8, BN_FLAG=False, name='conv1', strides=2)
+            c = separable_conv(c, 32, name='conv2')
 
 
         up1 = upsampling(c, int(64*self.width), 'up1')

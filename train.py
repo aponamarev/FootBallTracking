@@ -27,10 +27,10 @@ coco_labels=[1, 2, 3, 4]
 learning_rate = 1e-3
 restore_model = False
 
-batch_sz=20
+batch_sz=24
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
-imshape=(512, 512)
+imshape=(320, 320)
 gpu_id = 0
 
 summary_step = 100

@@ -410,7 +410,7 @@ class ObjectDetectionNet(NetTemplate):
         bboxes = np.array(bboxes) * scale
 
         # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
-        bboxes = list(map(lambda x: coco_boxes2xmin_ymin_xmax_ymax(im, x), bboxes))
+        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
         labels = list(map(lambda x: self.labels_available.index(x), labels))
 
         # 3. Find mask (anchor ids)

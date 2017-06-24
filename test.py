@@ -11,13 +11,12 @@ from src.SmallNet import SmallNet
 import tensorflow as tf
 from tensorflow import placeholder
 from src.util import check_path, resize_wo_scale_dist, draw_boxes, cxcywh_xmin_ymin_xmax_ymax
-import numpy as np
 from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
 
 path_to_net = 'logs/t5/model.ckpt'
-imshape = (512, 512)
+imshape = (320, 320)
 batch_size = 1
 
 
@@ -35,7 +34,7 @@ def main():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, imshape)
+            net = SmallNet(coco_labels, imshape, width=0.5)
 
             # Create input placeholders for the net
             im_ph = placeholder(dtype=tf.float32, shape=[None,*imshape[::-1], 3], name="img")
@@ -90,8 +89,8 @@ def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
             kernel_id = final_cls_idx[box_id]
             label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))
 
-        #img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
-        img = draw_boxes(img, final_boxes, label)
+        img = draw_boxes(img, list(map(lambda x: cxcywh_xmin_ymin_xmax_ymax(x), final_boxes)), label)
+        #img = draw_boxes(img, final_boxes, label)
 
     return img
 
