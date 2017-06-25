@@ -21,7 +21,7 @@ from src.util import draw_boxes, bbox_transform, map_deltas
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
 PATH2IMAGES = 'dataset/coco/images/train2014'
-train_dir = 'logs/t5'
+train_dir = 'logs/conf_loss/t1'
 
 coco_labels=[1, 2, 3, 4]
 
