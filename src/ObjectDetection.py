@@ -54,8 +54,8 @@ class ObjectDetectionNet(NetTemplate):
         self.anchors = set_anchors(self.imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
-        self.LOSS_COEF_BBOX = 1.0 # should be float
-        self.LOSS_COEF_CLASS = 10.0 # should be float
+        self.LOSS_COEF_BBOX = 5.0 # should be float
+        self.LOSS_COEF_CLASS = 1.0 # should be float
         self.LOSS_COEF_CONF_POS = 75.0 # should be float
         self.LOSS_COEF_CONF_NEG = 100.0 # should be float
         self.input_img = None
@@ -291,7 +291,7 @@ class ObjectDetectionNet(NetTemplate):
                     # add a small value into log to prevent blowing up
                     pos_CE = L * -tf.log(self.P_class + ɛ)
                     neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
-                    self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask)/self.n_classes, n_obj, name='loss')
+                    self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask), n_obj, name='loss')
                     # add to a collection called losses to sum those losses later
                     tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 

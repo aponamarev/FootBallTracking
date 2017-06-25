@@ -42,13 +42,13 @@ class SmallNet(ObjectDetectionNet):
 
             with variable_scope('upsampling_' + name):
                 with variable_scope('tower1'):
-                    t1 = separable_conv(input, max(16, int(filters/4)), name='conv1')
+                    t1 = separable_conv(input, filters, name='conv1')
                     t1 = separable_conv(t1, filters, name='conv2')
                     t1 = separable_conv(t1, filters, name='conv3')
                     t1 = separable_conv(t1, filters, strides=2, name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = separable_conv(input, max(16, int(filters/4)), name='conv1')
+                    t2 = separable_conv(input, filters, name='conv2')
                     t2 = separable_conv(t2, filters, strides=2, name='conv2')
 
                 with variable_scope('tower3'):
@@ -62,7 +62,6 @@ class SmallNet(ObjectDetectionNet):
         def downsampling(input, filters, name):
 
             with variable_scope('downsampling_' + name):
-                input = bn(input, name='batch_norm')
                 d = deconv(input, filters, [3,3], [2,2], padding='SAME')
                 d = separable_conv(d, filters, name='output')
 
@@ -75,9 +74,6 @@ class SmallNet(ObjectDetectionNet):
                 l = separable_conv(dt, filters, name="L")
                 output = concat((td, l))
                 return separable_conv(output, filters, name="force_choice")
-
-
-
 
         inputs = self.input_img
 
