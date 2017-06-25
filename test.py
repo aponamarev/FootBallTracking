@@ -10,7 +10,7 @@ __email__ = "alex.ponamaryov@gmail.com"
 from src.SmallNet import SmallNet
 import tensorflow as tf
 from tensorflow import placeholder
-from src.util import check_path, resize_wo_scale_dist, draw_boxes, bbox_transform
+from src.util import check_path, resize_wo_scale_dist, draw_boxes, bbox_transform, filter_prediction
 from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
@@ -65,13 +65,13 @@ def main():
 
     for p in img_list:
         im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
-        im = process(im, net, sess, threshold=0.5, NMS_THRESH=0.3, max_obj=50)
+        im = process(im, net, sess, threshold=0.5, max_obj=50)
         imshow(im)
 
 
 
 
-def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
+def process(img, net, sess, threshold=0.5, max_obj=50):
 
 
 
@@ -82,9 +82,8 @@ def process(img, net, sess, threshold=0.5, NMS_THRESH=0.2, max_obj=50):
 
         label = []
 
-        final_boxes, final_probs, final_cls_idx = \
-            net.filter_prediction(p.bboxes[i], p.conf[i], p.classes[i],
-                                  PROB_THRESH=threshold, NMS_THRESH=NMS_THRESH, TOP_N_DETECTION=max_obj)
+        final_boxes, final_probs, final_cls_idx, anch_ids = filter_prediction(p.bboxes[i], p.conf[i], p.classes[i],
+                                                                              PROB_THRESH=threshold, TOP_N_DETECTIONS=max_obj)
         for box_id in range(len(final_boxes)):
             kernel_id = final_cls_idx[box_id]
             label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))

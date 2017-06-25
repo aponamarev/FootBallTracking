@@ -298,9 +298,14 @@ class ObjectDetectionNet(NetTemplate):
                 with tf.variable_scope('Confidence'):
 
                     anchor_mask = reshape(mask, [b_sz, WHK])
-
+                    # TODO: Check if convergence will accelerate when calculating confidence as anchor_mask-anchor_confidence
+                    # at the moment confidence loss calculated as a difference between IoU (predicted based on deltas) and
+                    # anchor confidence. This loss function depends on the precision of your deltas that drive IoU. Therefore
+                    # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
+                    # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
+                    # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
                     conf_pos = tf.square(self.IoU - self.anchor_confidence)
-                    norm = (anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj))
+                    norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
 
                     self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
 
@@ -356,46 +361,6 @@ class ObjectDetectionNet(NetTemplate):
                                   feed_dict={self.input_img: np.expand_dims(X_batch, 0),
                                              self.is_training: False}))
         return p
-
-
-    def filter_prediction(self, boxes, probs, cls_idx, TOP_N_DETECTION=50, PROB_THRESH=0.5, NMS_THRESH=0.2):
-        """Filter bounding box predictions with probability threshold and
-        non-maximum supression.
-        Args:
-          boxes: array of [cx, cy, w, h].
-          probs: array of probabilities
-          cls_idx: array of class indices
-        Returns:
-          final_boxes: array of filtered bounding boxes.
-          final_probs: array of filtered probabilities
-          final_cls_idx: array of filtered class indices
-        """
-
-        if TOP_N_DETECTION < len(probs) and TOP_N_DETECTION > 0:
-            order = probs.argsort()[:-TOP_N_DETECTION - 1:-1]
-            probs = probs[order]
-            boxes = boxes[order]
-            cls_idx = cls_idx[order]
-        else:
-            filtered_idx = np.nonzero(probs > PROB_THRESH)[0]
-            probs = probs[filtered_idx]
-            boxes = boxes[filtered_idx]
-            cls_idx = cls_idx[filtered_idx]
-
-        final_boxes = []
-        final_probs = []
-        final_cls_idx = []
-
-        for c in range(self.n_classes):
-            idx_per_class = [i for i in range(len(probs)) if cls_idx[i] == c]
-            keep = nms(boxes[idx_per_class], probs[idx_per_class], NMS_THRESH)
-            for i in range(len(keep)):
-                if keep[i]:
-                    final_boxes.append(boxes[idx_per_class[i]])
-                    final_probs.append(probs[idx_per_class[i]])
-                    final_cls_idx.append(c)
-
-        return final_boxes, final_probs, final_cls_idx
 
 
     def preprocess_COCO(self, img, labels, bboxes):
