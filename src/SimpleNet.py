@@ -22,7 +22,7 @@ class SimpleNet(ObjectDetectionNet):
 
         self.width = width
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 64), int(imshape[1] / 64))
+        self.outshape = Point(int(imshape[0] / 4), int(imshape[1] / 4))
 
         super().__init__(labels_provided, lr)
 
@@ -82,9 +82,9 @@ class SimpleNet(ObjectDetectionNet):
             c = separable_conv(c, 32, name='conv2')
 
         up1 = upsampling(c, int(64 * self.width), 'up1')
-        up2 = upsampling(up1, int(128 * self.width), 'up2')
-        up3 = upsampling(up2, int(256 * self.width), 'up3')
-        up4 = upsampling(up3, int(256 * self.width), 'up4')
-        up5 = upsampling(up4, int(512 * self.width), 'up5')
+        #up2 = upsampling(up1, int(128 * self.width), 'up2')
+        #up3 = upsampling(up2, int(256 * self.width), 'up3')
+        #up4 = upsampling(up3, int(256 * self.width), 'up4')
+        #up5 = upsampling(up4, int(512 * self.width), 'up5')
 
-        self.feature_map = separable_conv(up5, self.K*(self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(up1, self.K*(self.n_classes + 4 + 1), name='feature_map')
