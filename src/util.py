@@ -63,7 +63,8 @@ def bbox_transform_inv(bbox):
   return out_box
 
 def set_anchors(input_shape, output_shape,
-                anchor_shapes=np.array([[36., 36.], [366., 174.], [115., 59.], [78., 170.]])):
+                anchor_shapes=np.array([[36., 36.], [36.0*3, 36.], [36.0, 36.0*3],
+                                        [64., 64.], [64.0 * 3, 64.], [64.0, 64.0 * 3], [108., 108.]])):
     """
 
     :param input_shape: Input image shape (x,y)
@@ -113,7 +114,7 @@ def check_path(p):
     return p
 
 def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FONT_HERSHEY_COMPLEX_SMALL,
-               fontScale=0.75, color=(255, 0, 0), true_coord=False):
+               fontScale=0.75, color=(255, 0, 0)):
     """
     Draws bounding boxes_xmin_ymin_xmax_ymax and labels on an image
     :param img:
@@ -126,81 +127,73 @@ def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FON
     :return: img
     """
 
-    Y = img.shape[0]
-
     for b,l in zip(boxes_xmin_ymin_xmax_ymax, labels):
 
         xmin, ymin, xmax, ymax = b
 
-        if true_coord:
-            top_left = (int(xmin), int(ymax))
-            bottom_right = (int(xmax), int(ymin))
-        else:
-            top_left = (int(xmin), int(Y-ymax))
-            bottom_right = (int(xmax), int(Y-ymin))
+        top_left = (int(xmin), int(ymin))
+        bottom_right = (int(xmax), int(ymax))
 
         rectangle(img, top_left, bottom_right,color, thickness=thickness)
         (w, h), baseline = getTextSize(l, fontFace, fontScale, max(1, int(thickness / 2)))
-        label_y = ymax + thickness*2 + 1
-        if label_y + h > Y:
-            label_y = ymin - thickness*2 -1 - h
-            label_y = max((2, label_y))
+
+        if ymin < h + 2*thickness:
+            label_y = ymax + thickness*2 - 1
+        else:
+            label_y = max((2 + h + 2*thickness, ymin))
         label_x = (xmin+xmax-w)/2
         label_x = max((1, label_x))
 
-        origin = (int(label_x), int(Y-label_y))
+        origin = (int(label_x), int(label_y))
         putText(img, l, origin, fontFace, fontScale, color, thickness)
 
     return img
 
 
-def coco_boxes2xmin_ymin_xmax_ymax(img, box):
+def coco_boxes2xmin_ymin_xmax_ymax(box):
     """
     Converts coco native format into xmin, ymin, xmax, ymax
     :param img:
     :param box: [x,y,width,height] top left x,y and width, height delta to get to bottom right
     :return:
     """
-    Y = img.shape[0]
-    xmin, ymax, w, h = box
-    ymax = Y-ymax
+    xmin, ymin, w, h = box
     xmax = xmin+w
-    ymin = ymax-h
+    ymax = ymin+h
 
     return int(xmin), int(ymin), int(xmax), int(ymax)
 
 
-def cxcywh_xmin_ymin_xmax_ymax(box):
+def bbox_transform(box):
     """
     Convert coordinates from cx, cy, w, h format into xmin ymin xmax ymax
     :param box: cx, cy, w, h
     :return: xmin ymin xmax ymax
     """
 
-    x,y,w,h = box
+    with tf.name_scope('box_transform'):
+        x,y,w,h = box
 
-    xmin = x-w/2
-    xmax = x+w/2
-    ymin = y - h / 2
-    ymax = y + h / 2
+        xmin = x-w/2
+        xmax = x+w/2
+        ymin = y - h / 2
+        ymax = y + h / 2
 
-    return int(xmin), int(ymin), int(xmax), int(ymax)
+    return xmin, ymin, xmax, ymax
 
 
-def coco_boxes2cxcywh(img, box):
+def coco_boxes2cxcywh(box):
     """
-    Converts coco native format into xmin, ymin, xmax, ymax
+    Converts coco native format into xmin, ymin, xmax, ymax where y=0 is the top of the image
     :param img:
     :param box: [x,y,width,height] top left x,y and width, height delta to get to bottom right
     :return:
     """
-    Y = img.shape[0]
-    xmin, ymax, w, h = box
-    ymax = Y-ymax
+    xmin, ymin, w, h = box
     x = xmin + w/2
-    y = ymax - h/2
+    y = ymin + h/2
 
-    return int(x), int(y), int(w), int(h)
+    return x, y, w, h
 
 
 def resize_wo_scale_dist(img, shape):
@@ -272,8 +265,8 @@ def estimate_deltas(bboxes, anchor_ids, anchors):
         if not(box_w > 0) or not(box_h > 0):
             raise ValueError("Incorrect bbox size: height {}, width {}".format(box_h, box_w))
         delta = [0] * 4
-        delta[0] = (box_cx - anchors[aid][0]) / box_w
-        delta[1] = (box_cy - anchors[aid][1]) / box_h
+        delta[0] = (box_cx - anchors[aid][0]) / anchors[aid][2]
+        delta[1] = (box_cy - anchors[aid][1]) / anchors[aid][3]
         delta[2] = np.log(box_w / anchors[aid][2])
         delta[3] = np.log(box_h / anchors[aid][3])
         delta_per_img.append(delta)
@@ -335,7 +328,7 @@ def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
         obj_anchor_id = aidx[lbl_num]
         obj_label = labels[lbl_num]
         box_deltas = boxes_deltas[lbl_num]
-        box_xyhw = cxcywh_xmin_ymin_xmax_ymax(bboxes[lbl_num])
+        box_cxcywh = bboxes[lbl_num]
         if (obj_anchor_id) not in aidx_set:
             aidx_set.add(obj_anchor_id)
             # 2. Create a list of unique objects in the batch through triples [im_index, anchor, label]
@@ -344,7 +337,7 @@ def convertToFixedSize(aidx, labels, boxes_deltas, bboxes):
             # For bounding boxes duplicate [im_num, anchor_id] 4 times (one time of each coordinates x,y,w,h
             bbox_indices.extend([[obj_anchor_id, xywh] for xywh in range(4)])
             box_delta_values.extend(box_deltas)
-            box_values.extend(box_xyhw)
+            box_values.extend(box_cxcywh)
         else:
             num_discarded_labels += 1
     return label_indices, bbox_indices, box_delta_values, mask_indices, box_values
@@ -451,6 +444,6 @@ def map_deltas(a, d):
     cx = x + dx * w
     cy = y + dy * h
     width = w * np.exp(dw)
-    height = w * np.exp(dh)
+    height = h * np.exp(dh)
 
-    return cxcywh_xmin_ymin_xmax_ymax((cx,cy,width, height))
+    return bbox_transform((cx, cy, width, height))

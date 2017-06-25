@@ -15,8 +15,8 @@ from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from src.COCO_DB import COCO
-from src.SimpleNet import SimpleNet as Net
-from src.util import draw_boxes, cxcywh_xmin_ymin_xmax_ymax, map_deltas
+from src.SmallNet import SmallNet as Net
+from src.util import draw_boxes, bbox_transform, map_deltas
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
@@ -31,7 +31,7 @@ restore_model = False
 batch_sz=24
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
-imshape=(512, 512)
+imshape=(320, 320)
 gpu_id = 0
 
 summary_step = 100
@@ -112,7 +112,6 @@ def train():
         saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
         saver.restore(sess, join(train_dir, 'model.ckpt'))
 
-
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
     threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
@@ -143,9 +142,6 @@ def train():
 
             pass_tracker_end = time.time()
 
-            viz_summary = sess.run(img_viz, feed_dict={net.input_img: dgb_viz(net, sess, dequeue_op)})
-            summary_writer.add_summary(viz_summary, step)
-
             summary_writer.add_summary(summary_str, step)
 
             # Report results
@@ -172,7 +168,7 @@ def train():
             'class_loss: {}'.format(loss_value, conf_loss, bbox_loss, class_loss)
 
         # Save the model checkpoint periodically.
-        if step % checkpoint_step == checkpoint_step-1 or step == max_steps:
+        if step % checkpoint_step == 0 or step == max_steps:
             summary_writer.add_summary(summary_str, step)
             checkpoint_path = join(train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path)
@@ -195,8 +191,6 @@ def dgb_viz(net, sess,  inputs):
     im, bboxes, deltas, mask, labels = sess.run(inputs)
     anchors = net.anchors
 
-    im = im / 255.0 - 0.5
-
     for i in range(im.shape[0]):
 
         a_ids = mask[i].nonzero()
@@ -211,19 +205,10 @@ def dgb_viz(net, sess,  inputs):
             final_deltas.append(deltas[i][a_id])
 
         im[i] = draw_boxes(im[i],
-                           list(map(cxcywh_xmin_ymin_xmax_ymax, final_bboxes)), final_lables,
-                           color=(0, 255, 0), true_coord=True)
-        im[i] = draw_boxes(im[i], [map_deltas(a,d) for a,d in zip(final_anchors, final_deltas)], final_lables, true_coord=True)
-
-        plt.imshow(im[i])
-
-    plt.imshow(im[0])
-    plt.imshow(im[1])
-    plt.imshow(im[2])
-    plt.imshow(im[3])
-    plt.imshow(im[4])
-    plt.imshow(im[5])
-    plt.imshow(im[6])
+                           list(map(bbox_transform, final_bboxes)), final_lables,
+                           color=(0.0, 255.0, 0.0))
+        im[i] = draw_boxes(im[i], [map_deltas(a,d) for a,d in zip(final_anchors, final_deltas)],
+                           final_lables, color=(255.0, 0.0, 0.0))
 
     return im
 

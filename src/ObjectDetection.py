@@ -11,9 +11,9 @@ from collections import namedtuple
 import tensorflow as tf
 import numpy as np
 from tensorflow import variable_scope, reshape, sigmoid, reduce_mean, reduce_sum, nn,\
-    unstack, identity, stack, truediv
+    unstack, stack, truediv
 from .util import safe_exp, bbox_transform, bbox_transform_inv, set_anchors, resize_wo_scale_dist, draw_boxes,\
-    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, cxcywh_xmin_ymin_xmax_ymax, convertToFixedSize, sparse_to_dense, nms
+    find_anchor_ids, estimate_deltas, coco_boxes2cxcywh, convertToFixedSize, sparse_to_dense, nms
 from .NetTemplate import NetTemplate
 
 Point = namedtuple('Point',['x', 'y'])
@@ -27,7 +27,8 @@ class ObjectDetectionNet(NetTemplate):
 
 
     def __init__(self, labels_provided, lr,
-                 anchor_shapes=np.array([[36., 36.],[366., 174.],[115.,  59.],[78., 170.]])):
+                 anchor_shapes=np.array([[36., 36.], [36.0*3, 36.], [36.0, 36.0*3],
+                                         [64., 64.], [64.0 * 3, 64.], [64.0, 64.0 * 3], [108., 108.]])):
         """
         A skeleton of SqueezeDet Net.
 
@@ -206,8 +207,8 @@ class ObjectDetectionNet(NetTemplate):
 
             with variable_scope('IOU'):
 
-                box1 = bbox_transform(unstack(self.det_boxes, axis=2))
-                box2 = bbox_transform(unstack(self.input_box_values, axis=2))
+                box1 = bbox_transform(unstack(self.det_boxes, axis=2)) #xmin, ymin, xmax, ymax
+                box2 = bbox_transform(unstack(self.input_box_values, axis=2)) #xmin, ymin, xmax, ymax
 
                 with tf.variable_scope('intersection'):
                     inters_xmin = tf.maximum(box1[0], box2[0], name='xmin')
@@ -402,7 +403,7 @@ class ObjectDetectionNet(NetTemplate):
         Transforms inputs into expected net format.
         :param img: RGB img -> will be scaled to a fixed size
         :param labels:
-        :param bboxes: [[cx,cy,w,h]] where y=0 is the image bottom - will be scalled to a fixed size
+        :param bboxes: [[cx,cy,w,h]] where y=0 is the image top - will be scaled to a fixed size
         :return: img, labels, mask, bbox_values, bbox_deltas
         """
 
@@ -411,11 +412,9 @@ class ObjectDetectionNet(NetTemplate):
         bboxes = np.array(bboxes) * scale
 
         # 2. Convert COCO bounding boxes into cx, cy, w, h format and labels into net native format
-        bboxes = list(map(lambda x: coco_boxes2cxcywh(im, x), bboxes))
-        labels = list(map(lambda x: self.labels_available.index(x), labels))
 
-        im1 = draw_boxes(im, list(map(cxcywh_xmin_ymin_xmax_ymax, bboxes)), labels, true_coord=True)
-        plt.imshow(im1/255-0.5)
+        bboxes = list(map(lambda x: coco_boxes2cxcywh(x), bboxes))
+        labels = list(map(lambda x: self.labels_available.index(int(x)), labels))
 
         # 3. Find mask (anchor ids)
         aids = find_anchor_ids(bboxes, self.anchors)
