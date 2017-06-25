@@ -48,7 +48,7 @@ class SmallNet(ObjectDetectionNet):
                     t1 = separable_conv(t1, filters, strides=2, name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = separable_conv(input, filters, name='conv2')
+                    t2 = separable_conv(input, filters, name='conv1')
                     t2 = separable_conv(t2, filters, strides=2, name='conv2')
 
                 with variable_scope('tower3'):
