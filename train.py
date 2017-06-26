@@ -6,7 +6,6 @@ Created 6/15/17.
 __author__ = "Alexander Ponamarev"
 __email__ = "alex.ponamaryov@gmail.com"
 
-from matplotlib import pyplot as plt
 import tensorflow as tf
 import threading
 import numpy as np
@@ -26,7 +25,7 @@ train_dir = 'logs/t5'
 coco_labels=[1, 2, 3, 4]
 
 learning_rate = 1e-4
-restore_model = False
+restore_model = True
 
 batch_sz=24
 queue_capacity = batch_sz * 4

@@ -65,7 +65,7 @@ def main():
 
     for p in img_list:
         im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
-        im = process(im, net, sess, threshold=0.5, max_obj=50)
+        im = process(im, net, sess, threshold=0.35, max_obj=50)
         imshow(im)
 
 

@@ -6,7 +6,6 @@ Created 6/13/17.
 __author__ = "Alexander Ponamarev"
 __email__ = "alex.ponamaryov@gmail.com"
 
-from matplotlib import pyplot as plt
 from collections import namedtuple
 import tensorflow as tf
 import numpy as np
@@ -304,7 +303,7 @@ class ObjectDetectionNet(NetTemplate):
                     # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
                     # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
                     # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
-                    conf_pos = tf.square(self.IoU - self.anchor_confidence)
+                    conf_pos = tf.square(self.IoU - self.det_probs)
                     norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
 
                     self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
@@ -357,7 +356,7 @@ class ObjectDetectionNet(NetTemplate):
 
 
     def infer(self, X_batch, sess):
-        p = Predictions(*sess.run([self.det_boxes, self.det_probs, self.det_class],
+        p = Predictions(*sess.run([self.det_boxes, self.anchor_confidence, self.P_class],
                                   feed_dict={self.input_img: np.expand_dims(X_batch, 0),
                                              self.is_training: False}))
         return p
