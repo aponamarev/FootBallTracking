@@ -299,7 +299,7 @@ class ObjectDetectionNet(NetTemplate):
 
                     anchor_mask = reshape(mask, [b_sz, WHK])
 
-                    conf_pos = tf.square(anchor_mask - self.anchor_confidence)
+                    conf_pos = tf.square(anchor_mask - self.det_probs)
                     norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
 
                     self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
