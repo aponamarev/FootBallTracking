@@ -91,11 +91,15 @@ class SmallNet(ObjectDetectionNet):
 
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
-        c = conv(inputs, 8, BN_FLAG=True, name='conv1')
+        c = conv(inputs, 8, BN_FLAG=False, name='conv1')
         c = separable_conv(c, 32, BN_FLAG=True, strides=2, name='conv2')
-        c = separable_conv(c, 64, BN_FLAG=True, strides=2, name='conv3')
-        c = separable_conv(c, 128, BN_FLAG=True, strides=2, name='conv4')
-        c = separable_conv(c, 256, BN_FLAG=True, strides=2, name='conv5')
-        c = separable_conv(c, 512, BN_FLAG=True, strides=2, name='conv6')
+        c = separable_conv(c, int(32*self.width), BN_FLAG=True, name='conv3')
+        c = separable_conv(c, int(64*self.width), BN_FLAG=True, strides=2, name='conv4')
+        c = separable_conv(c, int(64*self.width), BN_FLAG=True, name='conv5')
+        c = separable_conv(c, int(128*self.width), BN_FLAG=True, strides=2, name='conv6')
+        c = separable_conv(c, int(128*self.width), BN_FLAG=True, name='conv7')
+        c = separable_conv(c, int(256*self.width), BN_FLAG=True, strides=2, name='conv8')
+        c = separable_conv(c, int(256*self.width), BN_FLAG=True, name='conv9')
+        c = separable_conv(c, int(512*self.width), BN_FLAG=True, strides=2, name='conv10')
 
         self.feature_map = separable_conv(c, self.K * (self.n_classes + 4 + 1), name='feature_map')
