@@ -91,7 +91,7 @@ class SmallNet(ObjectDetectionNet):
 
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
-        c = conv(inputs, 8, BN_FLAG=False, name='conv1')
+        c = conv(inputs, 8, BN_FLAG=True, name='conv1')
         c = separable_conv(c, 32, BN_FLAG=True, strides=2, name='conv2')
         c = separable_conv(c, 64, BN_FLAG=True, strides=2, name='conv3')
         c = separable_conv(c, 128, BN_FLAG=True, strides=2, name='conv4')

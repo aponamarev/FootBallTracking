@@ -27,7 +27,7 @@ coco_labels=[1, 2, 3, 4]
 learning_rate = 1e-4
 restore_model = True
 
-batch_sz=64
+batch_sz=128
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
 imshape=(320, 320)

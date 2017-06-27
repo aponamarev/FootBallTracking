@@ -85,7 +85,7 @@ class NetTemplate(object):
             conv = separable_conv2d(inputs=inputs,
                                     num_outputs=None,
                                     stride=strides,
-                                    activation_fn=tf.nn.elu,
+                                    activation_fn=tf.nn.relu,
                                     kernel_size=[kernel_size, kernel_size],
                                     depth_multiplier=1,
                                     padding=padding,
@@ -96,7 +96,7 @@ class NetTemplate(object):
 
             conv = conv2d(inputs=conv,
                           num_outputs=filters,
-                          activation_fn=tf.nn.elu,
+                          activation_fn=tf.nn.relu,
                           kernel_size=[1,1],
                           scope='pointwise_conv')
 
