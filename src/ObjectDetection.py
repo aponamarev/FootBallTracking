@@ -134,7 +134,6 @@ class ObjectDetectionNet(NetTemplate):
         feature_map = self.feature_map
         n_classes = self.n_classes
         mask = self.input_mask
-        b_sz = tf.shape(feature_map)[0]
         K = self.K
         KC = self.K * self.n_classes
         WHK = self.WHK
@@ -153,7 +152,7 @@ class ObjectDetectionNet(NetTemplate):
                                             [-1, n_classes])
                 # Softmax calculates probability distribution over the last dimension (classes)
                 P_class = nn.softmax(class_logits)
-                self.P_class = reshape(P_class, [b_sz, WHK, n_classes], name="P")
+                self.P_class = reshape(P_class, [-1, WHK, n_classes], name="P")
 
             with variable_scope('confidence'):
                 """
@@ -162,7 +161,7 @@ class ObjectDetectionNet(NetTemplate):
                 # Extract anchor logits for each image (batch sz dimension)
                 n_anchors_slice = (KC + K)
                 anchor_confidence = reshape(feature_map[:, :, :, KC:n_anchors_slice],
-                                            [b_sz, WHK])
+                                            [-1, WHK])
                 # Estimate highest confidence
                 self.anchor_confidence = sigmoid(anchor_confidence, name="C")
 
@@ -170,7 +169,7 @@ class ObjectDetectionNet(NetTemplate):
             """
             """
             box_deltas = feature_map[:,:,:, n_anchors_slice:]
-            self.detected_box_deltas = reshape(box_deltas, [b_sz, WHK, 4], name="deltas")
+            self.detected_box_deltas = reshape(box_deltas, [-1, WHK, 4], name="deltas")
             imshape = self.imshape
 
             with variable_scope('stretching'):
@@ -227,11 +226,11 @@ class ObjectDetectionNet(NetTemplate):
 
                     union = w1 * h1 + w2 * h2 - intersection
 
-                self.IoU = tf.multiply(intersection / (union + ɛ), reshape(mask, [b_sz, self.WHK]), name='IoU')
+                self.IoU = tf.multiply(intersection / (union + ɛ), reshape(mask, [-1, self.WHK]), name='IoU')
 
             with variable_scope('probability'):
 
-                probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [b_sz, WHK, 1]), name='final_class_prob')
+                probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [-1, WHK, 1]), name='final_class_prob')
 
                 self.det_probs = tf.reduce_max(probs, 2, name='score')
                 tf.add_to_collection("predictions", self.det_probs)
@@ -266,8 +265,6 @@ class ObjectDetectionNet(NetTemplate):
         SqueezeDet: Unified, Small, Low Power Fully Convolutional Neural Networks for Real-Time Object Detection
         for Autonomous Driving. arXiv.
         """
-
-        b_sz = tf.shape(self.feature_map)[0]
         mask = self.input_mask # is 1 if anchor and ground truth input_mask is this highest and 0 otherwise
         W_bbox = self.LOSS_COEF_BBOX # weigt of bounding box loss
         W_ce = self.LOSS_COEF_CLASS # weight of cross entropy  loss (P(class))
@@ -296,14 +293,14 @@ class ObjectDetectionNet(NetTemplate):
 
                 with tf.variable_scope('Confidence'):
 
-                    anchor_mask = reshape(mask, [b_sz, WHK])
+                    anchor_mask = reshape(mask, [-1, WHK])
                     # TODO: Check if convergence will accelerate when calculating confidence as anchor_mask-anchor_confidence
                     # at the moment confidence loss calculated as a difference between IoU (predicted based on deltas) and
                     # anchor confidence. This loss function depends on the precision of your deltas that drive IoU. Therefore
                     # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
                     # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
                     # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
-                    conf_pos = tf.square(self.IoU - self.det_probs) # Finally fixed probability
+                    conf_pos = tf.square(self.IoU - self.anchor_confidence)
                     norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
 
                     self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
@@ -356,7 +353,7 @@ class ObjectDetectionNet(NetTemplate):
 
 
     def infer(self, X_batch, sess):
-        p = Predictions(*sess.run([self.det_boxes, self.anchor_confidence, self.P_class],
+        p = Predictions(*sess.run([self.det_boxes, self.det_probs, self.det_class],
                                   feed_dict={self.input_img: np.expand_dims(X_batch, 0),
                                              self.is_training: False}))
         return p

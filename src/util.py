@@ -495,7 +495,7 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
     final_boxes, final_probs, final_cls_idx = boxes[anch_ids], probs[anch_ids], cls_idx[anch_ids]
     # Limit the number of predictions
     if len(final_probs)>TOP_N_DETECTIONS:
-        anch_ids = final_probs.argsort()[:-TOP_N_DETECTIONS - 1:-1]
+        anch_ids = final_probs.argsort()[::-1][:TOP_N_DETECTIONS]
         final_boxes, final_probs, final_cls_idx = final_boxes[anch_ids], final_probs[anch_ids], final_cls_idx[anch_ids]
 
     return final_boxes, final_probs, final_cls_idx, anch_ids

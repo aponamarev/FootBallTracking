@@ -23,7 +23,7 @@ class SmallNet(ObjectDetectionNet):
         self.width=width
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 4), int(imshape[1] / 4))
+        self.outshape = Point(int(imshape[0] / 32), int(imshape[1] / 32))
 
         super().__init__(labels_provided, lr)
 
@@ -93,13 +93,6 @@ class SmallNet(ObjectDetectionNet):
         up1 = upsampling(c, int(64*self.width), 'up1')
         up2 = upsampling(up1, int(128*self.width), 'up2')
         up3 = upsampling(up2, int(256*self.width), 'up3')
-        up4 = upsampling(up3, int(256*self.width), 'up4')
+        up4 = upsampling(up3, int(512*self.width), 'up4')
 
-        dw3 = downsampling(up4, int(256*self.width), 'd3')
-        dw3 = lateral_connection(dw3, up3, int(256*self.width), 'tdm3')
-        dw2 = downsampling(dw3, int(128*self.width), 'd2')
-        dw2 = lateral_connection(dw2, up2, int(128*self.width), 'tdm2')
-        dw1 = downsampling(dw2, int(64*self.width), 'd1')
-        dw1 = lateral_connection(dw1, up1, int(64*self.width), 'tdm1')
-
-        self.feature_map = separable_conv(dw1, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(up4, self.K * (self.n_classes + 4 + 1), name='feature_map')
