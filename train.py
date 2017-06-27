@@ -24,7 +24,7 @@ train_dir = 'logs/t6'
 
 coco_labels=[1, 2, 3, 4]
 
-learning_rate = 1e-4
+learning_rate = 1e-3
 restore_model = True
 
 batch_sz=128
