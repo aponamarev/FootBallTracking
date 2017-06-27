@@ -85,14 +85,17 @@ class SmallNet(ObjectDetectionNet):
 
 
 
-        with variable_scope("input_upsampling"):
-            c = conv(inputs, 8, BN_FLAG=False, name='conv1', strides=2)
-            c = separable_conv(c, 32, name='conv2')
+        with name_scope('inputs'):
 
+            tf.summary.image("imgs", inputs, max_outputs=2)
 
-        up1 = upsampling(c, int(64*self.width), 'up1')
-        up2 = upsampling(up1, int(128*self.width), 'up2')
-        up3 = upsampling(up2, int(256*self.width), 'up3')
-        up4 = upsampling(up3, int(512*self.width), 'up4')
+            inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
-        self.feature_map = separable_conv(up4, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        c = conv(inputs, 8, BN_FLAG=False, name='conv1')
+        c = separable_conv(c, 32, BN_FLAG=True, strides=2, name='conv2')
+        c = separable_conv(c, 64, BN_FLAG=True, strides=2, name='conv3')
+        c = separable_conv(c, 128, BN_FLAG=True, strides=2, name='conv4')
+        c = separable_conv(c, 256, BN_FLAG=True, strides=2, name='conv5')
+        c = separable_conv(c, 512, BN_FLAG=True, strides=2, name='conv6')
+
+        self.feature_map = separable_conv(c, self.K * (self.n_classes + 4 + 1), name='feature_map')
