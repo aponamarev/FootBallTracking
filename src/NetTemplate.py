@@ -197,7 +197,7 @@ class NetTemplate(object):
 
         return implemented_types[type]('{}_img'.format(activation.op.name), activation)
 
-    def _activation(self, input, type=None):
+    def _activation(self, type=None):
         type = type or self.default_activation
         implemented_types = {
             'elu': self._elu_activation,
