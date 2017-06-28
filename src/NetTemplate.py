@@ -200,8 +200,8 @@ class NetTemplate(object):
     def _activation(self, type=None):
         type = type or self.default_activation
         implemented_types = {
-            'elu': self._elu_activation,
-            'relu': self._relu_activation
+            'elu': tf.nn.elu,
+            'relu': tf.nn.relu
         }
         assert type in implemented_types.keys(), "Incorrect type provided ({}). Only {} types are implemented at the moment".\
             format(type, implemented_types.keys())
