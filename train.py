@@ -28,7 +28,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("train_dir", "logs/t1", "Provide training directory for recovering and storing model. Default value is logs/t6")
 flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. Default value is 1e-3")
 flags.DEFINE_bool("restore", False, "Do you want to restore a model? Default value is False.")
-flags.DEFINE_integer("batch_size", 96, "Provide a size of the minibatch. Default value is 96.")
+flags.DEFINE_integer("batch_size", 128, "Provide a size of the minibatch. Default value is 128.")
 flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
 flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
@@ -146,7 +146,18 @@ def train():
         if step % summary_step == 0:
             op_list = [net.train_op, net.loss, summary_op, net.P_loss, net.conf_loss, net.bbox_loss]
 
-            _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
+            if FLAGS.debug:
+
+                ################
+                ### Debuggin ###
+                ################
+
+                data = generate_sample(net)
+                _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
+                    sess.run(op_list, feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
+                                                   mask_ph: data[3], labels_ph: data[4], net.is_training: False})
+            else:
+                _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
 
             pass_tracker_end = time.time()
 
@@ -164,9 +175,23 @@ def train():
             prior_step = step
 
         else:
-            _, loss_value, conf_loss, bbox_loss, class_loss = \
-                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
-                         feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
+
+            if FLAGS.debug:
+
+                ################
+                ### Debuggin ###
+                ################
+
+                data = generate_sample(net)
+                _, loss_value, conf_loss, bbox_loss, class_loss = \
+                    sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
+                             feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
+                                          mask_ph: data[3], labels_ph: data[4], net.is_training: True})
+            else:
+                _, loss_value, conf_loss, bbox_loss, class_loss = \
+                    sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
+                             feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
+
             pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
                              class_loss="{:.1f}%".format(class_loss*100),
                              total_loss="{:.2f}".format(loss_value))
@@ -180,10 +205,6 @@ def train():
             summary_writer.add_summary(summary_str, step)
             checkpoint_path = join(train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path)
-
-            ################
-            ### Debuggin ###
-            ################
 
     # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.
     sess.run(queue.close(cancel_pending_enqueues=True))
