@@ -84,7 +84,7 @@ def generate_sample(net):
             except:
                 pass
 
-    return [im, bboxes, deltas, mask, labels]
+    return [np.array(im), np.array(bboxes), np.array(deltas), np.array(mask), np.array(labels)]
 
 
 def enqueue_thread(coord, sess, net, enqueue_op, inputs):
