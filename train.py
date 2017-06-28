@@ -172,7 +172,7 @@ def train():
     sess.run(initializer)
 
     if FLAGS.debug:
-        sess = tf_debg.LocalCLIDebugWrapperSession(sess)
+        sess = tf_debg.LocalCLIDebugWrapperSession(sess, train_dir+"/debug")
         sess.add_tensor_filter("has_inf_or_nan", tf_debg.has_inf_or_nan)
 
     if restore_model:
