@@ -59,7 +59,7 @@ class NetTemplate(object):
         raise NotImplementedError("Loss estimate was not defined!")
 
 
-    def _conv2d(self, inputs, filters, kernel_size=3, strides=[1,1],
+    def _conv2d(self, inputs, filters, kernel_size=3, strides=1,
                 padding="SAME",name="conv2d", bias=True, BN_FLAG=True):
         """
         kernel_size: An integer or tuple/list of 2 integers, specifying the width and height of the 2D convolution window.

@@ -30,7 +30,7 @@ flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. De
 flags.DEFINE_bool("restore", False, "Do you want to restore a model? Default value is False.")
 flags.DEFINE_integer("batch_size", 128, "Provide a size of the minibatch. Default value is 128.")
 flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
-flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
+flags.DEFINE_bool("debug", True, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
 
@@ -55,13 +55,34 @@ coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
 def generate_sample(net):
     looking = True
-    while looking:
-        try:
-            im, labels, bboxes = coco.get_sample()
-            im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
-            looking = False
-        except:
-            pass
+    if FLAGS.debug:
+
+        ################
+        ### Debuggin ###
+        ################
+
+        im, bboxes, deltas, mask, labels = [],[],[],[],[]
+        while looking:
+            try:
+                im_, l_, b_ = coco.get_sample()
+                im_, l_, m_, d_, b_ = net.preprocess_COCO(im_, l_, b_)
+                im.append(im_)
+                bboxes.append(bboxes)
+                deltas.append(d_)
+                mask.append(m_)
+                labels.append(l_)
+                looking = False if len(im)>=batch_sz else True
+            except:
+                pass
+
+    else:
+        while looking:
+            try:
+                im, labels, bboxes = coco.get_sample()
+                im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
+                looking = False
+            except:
+                pass
 
     return [im, bboxes, deltas, mask, labels]
 
