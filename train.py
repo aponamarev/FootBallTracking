@@ -55,34 +55,13 @@ coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
 def generate_sample(net):
     looking = True
-    if FLAGS.debug:
-
-        ################
-        ### Debuggin ###
-        ################
-
-        im, bboxes, deltas, mask, labels = [],[],[],[],[]
-        while looking:
-            try:
-                im_, l_, b_ = coco.get_sample()
-                im_, l_, m_, d_, b_ = net.preprocess_COCO(im_, l_, b_)
-                im.append(im_)
-                bboxes.append(b_)
-                deltas.append(d_)
-                mask.append(m_)
-                labels.append(l_)
-                looking = False if len(im)>=batch_sz else True
-            except:
-                pass
-
-    else:
-        while looking:
-            try:
-                im, labels, bboxes = coco.get_sample()
-                im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
-                looking = False
-            except:
-                pass
+    while looking:
+        try:
+            im, labels, bboxes = coco.get_sample()
+            im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
+            looking = False
+        except:
+            pass
 
     return [im, bboxes, deltas, mask, labels]
 
@@ -103,60 +82,31 @@ def train():
             net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=0.5)
 
             # Create inputs
-            if FLAGS.debug:
-
-                ################
-                ### Debuggin ###
-                ################
-                im_ph = placeholder(dtype=tf.float32, shape=[batch_sz, imshape[0], imshape[1], 3], name="img")
-                labels_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, net.n_classes], name="labels")
-                mask_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 1], name="mask")
-                deltas_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 4], name="deltas_gt")
-                bbox_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 4], name="bbox_gt")
-
-            else:
-                im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
-                labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
-                mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
-                deltas_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="deltas_gt")
-                bbox_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="bbox_gt")
+            im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
+            labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
+            mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
+            deltas_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="deltas_gt")
+            bbox_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="bbox_gt")
 
             inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
 
-            if FLAGS.debug:
-
-                ################
-                ### Debuggin ###
-                ################
-
-                pass
-
-            else:
-
-                # Create a queue that will be prefetching samples
-                shapes = [v.get_shape().as_list() for v in inputs]
-                queue = FIFOQueue(capacity=queue_capacity,
-                                  dtypes=[v.dtype for v in inputs],
-                                  shapes=shapes)
-                # It is interesting to monitor the size of the buffer
-                q_size = queue.size()
-                tf.summary.scalar("prefetching_queue_size", q_size)
-                enqueue_op = queue.enqueue(inputs)
-                dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
-                                            shapes=shapes, name="Batch_{}_samples".format(batch_sz),
-                                            num_threads=prefetching_threads)
-                # Launch coordinator that will manage threads
-                coord = tf.train.Coordinator()
+            # Create a queue that will be prefetching samples
+            shapes = [v.get_shape().as_list() for v in inputs]
+            queue = FIFOQueue(capacity=queue_capacity,
+                              dtypes=[v.dtype for v in inputs],
+                              shapes=shapes)
+            # It is interesting to monitor the size of the buffer
+            q_size = queue.size()
+            tf.summary.scalar("prefetching_queue_size", q_size)
+            enqueue_op = queue.enqueue(inputs)
+            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
+                                        shapes=shapes, name="Batch_{}_samples".format(batch_sz),
+                                        num_threads=prefetching_threads)
+            # Launch coordinator that will manage threads
+            coord = tf.train.Coordinator()
 
             net.optimization_op = FLAGS.optimizer
-            if FLAGS.debug:
-
-                ################
-                ### Debuggin ###
-                ################
-                net.setup_inputs(im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
-            else:
-                net.setup_inputs(*dequeue_op)
+            net.setup_inputs(*dequeue_op)
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
@@ -171,19 +121,13 @@ def train():
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
 
-    if FLAGS.debug:
-        sess = tf_debg.LocalCLIDebugWrapperSession(sess, train_dir+"/debug")
-        sess.add_tensor_filter("has_inf_or_nan", tf_debg.has_inf_or_nan)
-
     if restore_model:
         saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
         saver.restore(sess, join(train_dir, 'model.ckpt'))
 
-
-    if not FLAGS.debug:
-        tf.train.start_queue_runners(sess=sess, coord=coord)
-        threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
-                   for _ in range(prefetching_threads)]
+    tf.train.start_queue_runners(sess=sess, coord=coord)
+    threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
+               for _ in range(prefetching_threads)]
 
     pass_tracker_start = time.time()
     pass_tracker_prior = pass_tracker_start
@@ -198,20 +142,7 @@ def train():
         if step % summary_step == 0:
             op_list = [net.train_op, net.loss, summary_op, net.P_loss, net.conf_loss, net.bbox_loss]
 
-            if FLAGS.debug:
-
-                ################
-                ### Debuggin ###
-                ################
-                print("Generate data")
-                data = generate_sample(net)
-                print("Finished data generation")
-                _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
-                    sess.run(op_list, feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
-                                                   mask_ph: data[3], labels_ph: data[4], net.is_training: False})
-                print("Processed one batch")
-            else:
-                _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
+            _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
 
             pass_tracker_end = time.time()
 
@@ -230,24 +161,9 @@ def train():
 
         else:
 
-            if FLAGS.debug:
-
-                ################
-                ### Debuggin ###
-                ################
-
-                print("Generate data")
-                data = generate_sample(net)
-                print("Finished data generation")
-                _, loss_value, conf_loss, bbox_loss, class_loss = \
-                    sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
-                             feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
-                                          mask_ph: data[3], labels_ph: data[4], net.is_training: True})
-                print("Processed one batch")
-            else:
-                _, loss_value, conf_loss, bbox_loss, class_loss = \
-                    sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
-                             feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
+            _, loss_value, conf_loss, bbox_loss, class_loss = \
+                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
+                         feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
 
             pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
                              class_loss="{:.1f}%".format(class_loss*100),
