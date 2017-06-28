@@ -67,7 +67,7 @@ def generate_sample(net):
                 im_, l_, b_ = coco.get_sample()
                 im_, l_, m_, d_, b_ = net.preprocess_COCO(im_, l_, b_)
                 im.append(im_)
-                bboxes.append(bboxes)
+                bboxes.append(b_)
                 deltas.append(d_)
                 mask.append(m_)
                 labels.append(l_)
@@ -84,7 +84,7 @@ def generate_sample(net):
             except:
                 pass
 
-    return [np.array(im), np.array(bboxes), np.array(deltas), np.array(mask), np.array(labels)]
+    return [im, bboxes, deltas, mask, labels]
 
 
 def enqueue_thread(coord, sess, net, enqueue_op, inputs):
