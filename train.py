@@ -103,11 +103,23 @@ def train():
             net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=0.5)
 
             # Create inputs
-            im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
-            labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
-            mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
-            deltas_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="deltas_gt")
-            bbox_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="bbox_gt")
+            if FLAGS.debug:
+
+                ################
+                ### Debuggin ###
+                ################
+                im_ph = placeholder(dtype=tf.float32, shape=[batch_sz, imshape[0], imshape[1], 3], name="img")
+                labels_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, net.n_classes], name="labels")
+                mask_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 1], name="mask")
+                deltas_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 4], name="deltas_gt")
+                bbox_ph = placeholder(dtype=tf.float32, shape=[batch_sz, net.WHK, 4], name="bbox_gt")
+
+            else:
+                im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
+                labels_ph = placeholder(dtype=tf.float32, shape=[net.WHK, net.n_classes], name="labels")
+                mask_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 1], name="mask")
+                deltas_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="deltas_gt")
+                bbox_ph = placeholder(dtype=tf.float32, shape=[net.WHK, 4], name="bbox_gt")
 
             inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
 
@@ -123,7 +135,14 @@ def train():
             dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
                                         shapes=shapes, name="Batch_{}_samples".format(batch_sz), num_threads=prefetching_threads)
             net.optimization_op = FLAGS.optimizer
-            net.setup_inputs(*dequeue_op)
+            if FLAGS.debug:
+
+                ################
+                ### Debuggin ###
+                ################
+                net.setup_inputs(im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
+            else:
+                net.setup_inputs(*dequeue_op)
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
