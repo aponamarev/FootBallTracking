@@ -499,3 +499,29 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
         final_boxes, final_probs, final_cls_idx = final_boxes[anch_ids], final_probs[anch_ids], final_cls_idx[anch_ids]
 
     return final_boxes, final_probs, final_cls_idx, anch_ids
+
+
+def dgb_viz(net, sess,  inputs):
+    im, bboxes, deltas, mask, labels = sess.run(inputs)
+    anchors = net.anchors
+
+    for i in range(im.shape[0]):
+
+        a_ids = mask[i].nonzero()
+        final_bboxes = []
+        final_lables = []
+        final_anchors = []
+        final_deltas = []
+        for a_id in a_ids[0]:
+            final_bboxes.append(bboxes[i][a_id])
+            final_lables.append(CLASSES[np.argmax(labels[i][a_id])])
+            final_anchors.append(anchors[a_id])
+            final_deltas.append(deltas[i][a_id])
+
+        im[i] = draw_boxes(im[i],
+                           list(map(bbox_transform, final_bboxes)), final_lables,
+                           color=(0.0, 255.0, 0.0))
+        im[i] = draw_boxes(im[i], [map_deltas(a,d) for a,d in zip(final_anchors, final_deltas)],
+                           final_lables, color=(255.0, 0.0, 0.0))
+
+    return im

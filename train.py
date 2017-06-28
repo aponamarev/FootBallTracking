@@ -13,29 +13,41 @@ import time
 from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
+from tensorflow.python.platform.app import flags
+from tensorflow.python import debug as tf_debg
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet as Net
-from src.util import draw_boxes, bbox_transform, map_deltas
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
-ANNOTATIONS_FILE = 'dataset/coco/annotations/instances_train2014.json'
-PATH2IMAGES = 'dataset/coco/images/train2014'
-train_dir = 'logs/t6'
-
+ANNOTATIONS_FILE = 'dataset/annotations/instances_train2014.json'
+PATH2IMAGES = 'dataset/images/train2014'
 coco_labels=[1, 2, 3, 4]
 
-learning_rate = 1e-3
-restore_model = True
 
-batch_sz=96
+FLAGS = flags.FLAGS
+flags.DEFINE_string("train_dir", "logs/t1", "Provide training directory for recovering and storing model. Default value is logs/t6")
+train_dir = FLAGS.train_dir
+flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. Default value is 1e-3")
+learning_rate = FLAGS.learning_rate
+flags.DEFINE_bool("restore", False, "Do you want to restore a model? Default value is False.")
+restore_model = FLAGS.restore
+flags.DEFINE_integer("batch_size", 96, "Provide a size of the minibatch. Default value is 96.")
+batch_sz=FLAGS.batch_size
+flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
+imshape=(FLAGS.resolution, FLAGS.resolution)
+flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
+flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
+flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
 queue_capacity = batch_sz * 4
 prefetching_threads = 2
-imshape=(320, 320)
 gpu_id = 0
 
 summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
+
+
+
 
 coco = COCO(ANNOTATIONS_FILE, PATH2IMAGES, CLASSES)
 
@@ -65,7 +77,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = Net(coco_labels, imshape, learning_rate, width=0.5)
+            net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=0.5)
 
             # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
@@ -87,9 +99,8 @@ def train():
             enqueue_op = queue.enqueue(inputs)
             dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
                                         shapes=shapes, name="Batch_{}_samples".format(batch_sz), num_threads=prefetching_threads)
+            net.optimization_op = FLAGS.optimizer
             net.setup_inputs(*dequeue_op)
-
-            img_viz = tf.summary.image("Input imgs", net.input_img, max_outputs=8)
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
@@ -106,6 +117,10 @@ def train():
     config.allow_soft_placement = True
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
+
+    if FLAGS.debug:
+        sess = tf_debg.LocalCLIDebugWrapperSession(sess)
+        sess.add_tensor_filter("has_inf_or_nan", tf_debg.has_inf_or_nan)
 
     if restore_model:
         saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
@@ -127,17 +142,9 @@ def train():
 
         # Configure operation that TF should run depending on the step number
         if step % summary_step == 0:
-            op_list = [
-                net.train_op,
-                net.loss,
-                summary_op,
-                net.P_loss,
-                net.conf_loss,
-                net.bbox_loss,
-            ]
+            op_list = [net.train_op, net.loss, summary_op, net.P_loss, net.conf_loss, net.bbox_loss]
 
-            _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
-                sess.run(op_list, feed_dict={net.is_training: False})
+            _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
 
             pass_tracker_end = time.time()
 
@@ -176,40 +183,12 @@ def train():
             ### Debuggin ###
             ################
 
-            viz_summary = sess.run(img_viz, feed_dict={net.input_img: dgb_viz(net, sess, dequeue_op)})
-            summary_writer.add_summary(viz_summary, step)
-
-        # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.
+    # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.
     sess.run(queue.close(cancel_pending_enqueues=True))
     coord.request_stop()
     # Tell coordinator to stop any queries to the threads
     coord.join(threads)
     sess.close()
-
-def dgb_viz(net, sess,  inputs):
-    im, bboxes, deltas, mask, labels = sess.run(inputs)
-    anchors = net.anchors
-
-    for i in range(im.shape[0]):
-
-        a_ids = mask[i].nonzero()
-        final_bboxes = []
-        final_lables = []
-        final_anchors = []
-        final_deltas = []
-        for a_id in a_ids[0]:
-            final_bboxes.append(bboxes[i][a_id])
-            final_lables.append(CLASSES[np.argmax(labels[i][a_id])])
-            final_anchors.append(anchors[a_id])
-            final_deltas.append(deltas[i][a_id])
-
-        im[i] = draw_boxes(im[i],
-                           list(map(bbox_transform, final_bboxes)), final_lables,
-                           color=(0.0, 255.0, 0.0))
-        im[i] = draw_boxes(im[i], [map_deltas(a,d) for a,d in zip(final_anchors, final_deltas)],
-                           final_lables, color=(255.0, 0.0, 0.0))
-
-    return im
 
 
 if __name__=='__main__':

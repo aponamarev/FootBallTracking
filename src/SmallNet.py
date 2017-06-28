@@ -18,7 +18,7 @@ Point = namedtuple('Point',['x', 'y'])
 
 class SmallNet(ObjectDetectionNet):
 
-    def __init__(self, labels_provided, imshape, lr=1e-3, width=1.0):
+    def __init__(self, labels_provided, imshape, lr=1e-3, activations='elu', width=1.0):
 
         self.width=width
 
@@ -26,6 +26,10 @@ class SmallNet(ObjectDetectionNet):
         self.outshape = Point(int(imshape[0] / 32), int(imshape[1] / 32))
 
         super().__init__(labels_provided, lr)
+
+        self.default_activation = activations
+
+
 
     def _add_featuremap(self):
 
