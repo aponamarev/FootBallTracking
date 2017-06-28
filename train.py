@@ -123,17 +123,31 @@ def train():
 
             inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
 
-            # Create a queue that will be prefetching samples
-            shapes = [v.get_shape().as_list() for v in inputs]
-            queue = FIFOQueue(capacity=queue_capacity,
-                              dtypes=[v.dtype for v in inputs],
-                              shapes=shapes)
-            # It is interesting to monitor the size of the buffer
-            q_size = queue.size()
-            tf.summary.scalar("prefetching_queue_size", q_size)
-            enqueue_op = queue.enqueue(inputs)
-            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
-                                        shapes=shapes, name="Batch_{}_samples".format(batch_sz), num_threads=prefetching_threads)
+            if FLAGS.debug:
+
+                ################
+                ### Debuggin ###
+                ################
+
+                pass
+
+            else:
+
+                # Create a queue that will be prefetching samples
+                shapes = [v.get_shape().as_list() for v in inputs]
+                queue = FIFOQueue(capacity=queue_capacity,
+                                  dtypes=[v.dtype for v in inputs],
+                                  shapes=shapes)
+                # It is interesting to monitor the size of the buffer
+                q_size = queue.size()
+                tf.summary.scalar("prefetching_queue_size", q_size)
+                enqueue_op = queue.enqueue(inputs)
+                dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
+                                            shapes=shapes, name="Batch_{}_samples".format(batch_sz),
+                                            num_threads=prefetching_threads)
+                # Launch coordinator that will manage threads
+                coord = tf.train.Coordinator()
+
             net.optimization_op = FLAGS.optimizer
             if FLAGS.debug:
 
@@ -150,9 +164,6 @@ def train():
 
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter(train_dir, graph)
-
-        # Launch coordinator that will manage threads
-        coord = tf.train.Coordinator()
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -191,11 +202,13 @@ def train():
                 ################
                 ### Debuggin ###
                 ################
-
+                print("Generate data")
                 data = generate_sample(net)
+                print("Finished data generation")
                 _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = \
                     sess.run(op_list, feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
                                                    mask_ph: data[3], labels_ph: data[4], net.is_training: False})
+                print("Processed one batch")
             else:
                 _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
 
@@ -222,11 +235,14 @@ def train():
                 ### Debuggin ###
                 ################
 
+                print("Generate data")
                 data = generate_sample(net)
+                print("Finished data generation")
                 _, loss_value, conf_loss, bbox_loss, class_loss = \
                     sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
                              feed_dict = {im_ph: data[0], bbox_ph: data[1], deltas_ph: data[2],
                                           mask_ph: data[3], labels_ph: data[4], net.is_training: True})
+                print("Processed one batch")
             else:
                 _, loss_value, conf_loss, bbox_loss, class_loss = \
                     sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
