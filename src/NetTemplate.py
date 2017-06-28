@@ -14,7 +14,7 @@ class NetTemplate(object):
         tf.add_to_collection(tf.GraphKeys.RESOURCES, self.dropout_rate)
         self.is_training = tf.placeholder(dtype=tf.bool, shape=[], name="is_training")
         tf.add_to_collection(tf.GraphKeys.RESOURCES, self.is_training)
-        self._default_activation = default_activation
+        self.default_activation = default_activation
         self._default_activation_summary = 'img'
         self._dtype = dtype
         self.feature_map=None
@@ -67,7 +67,7 @@ class NetTemplate(object):
         """
         with tf.variable_scope(name):
 
-            conv = conv2d(inputs=inputs, num_outputs=filters, activation_fn=tf.nn.elu,
+            conv = conv2d(inputs=inputs, num_outputs=filters, activation_fn=self._activation(),
                           kernel_size=kernel_size, stride=strides,padding=padding, scope=name)
             if BN_FLAG:
                 conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
@@ -85,7 +85,7 @@ class NetTemplate(object):
             conv = separable_conv2d(inputs=inputs,
                                     num_outputs=None,
                                     stride=strides,
-                                    activation_fn=tf.nn.elu,
+                                    activation_fn=self._activation(),
                                     kernel_size=[kernel_size, kernel_size],
                                     depth_multiplier=1,
                                     padding=padding,
@@ -96,7 +96,7 @@ class NetTemplate(object):
 
             conv = conv2d(inputs=conv,
                           num_outputs=filters,
-                          activation_fn=tf.nn.elu,
+                          activation_fn=self._activation(),
                           kernel_size=[1,1],
                           scope='pointwise_conv')
 
@@ -109,9 +109,8 @@ class NetTemplate(object):
     def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True):
 
         with tf.variable_scope(name):
-            conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding, activation=tf.nn.elu,
+            conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding, activation=self._activation(),
                                               use_bias=bias, kernel_initializer=xavier_initializer(), name="deconv")
-            conv = self._activation(conv)
 
         return conv
 
@@ -148,6 +147,8 @@ class NetTemplate(object):
 
                 line = tf.nn.bias_add(line, b, data_format='NHWC')
 
+
+
             return self._activation(line)
 
     def _max_pool(self, inputs, kernel=[1,2,2,1], strides=[1,2,2,1], padding="VALID", name = "max_pool"):
@@ -171,17 +172,15 @@ class NetTemplate(object):
             conv = tf.reshape(dropout, shape=shape)
         return conv
 
-    def _relu_activation(self, input):
+    def _relu_activation(self):
 
-        activation = tf.nn.relu(input)
-        #self._activation_summary(activation)
+        activation = tf.nn.relu
 
         return activation
 
-    def _elu_activation(self, input):
+    def _elu_activation(self):
 
-        activation = tf.nn.elu(input)
-        #self._activation_summary(activation)
+        activation = tf.nn.elu
 
         return activation
 
@@ -199,7 +198,7 @@ class NetTemplate(object):
         return implemented_types[type]('{}_img'.format(activation.op.name), activation)
 
     def _activation(self, input, type=None):
-        type = type or self._default_activation
+        type = type or self.default_activation
         implemented_types = {
             'elu': self._elu_activation,
             'relu': self._relu_activation
@@ -207,9 +206,7 @@ class NetTemplate(object):
         assert type in implemented_types.keys(), "Incorrect type provided ({}). Only {} types are implemented at the moment".\
             format(type, implemented_types.keys())
 
-        activation = implemented_types[type](input)
-
-        tf.add_to_collection(tf.GraphKeys.ACTIVATIONS, activation)
+        activation = implemented_types[type]
 
         return activation
 

@@ -327,6 +327,13 @@ class ObjectDetectionNet(NetTemplate):
         """Define the training operation."""
         self._add_loss_summaries(self.loss)
 
+        optimizers = {'adam': tf.train.AdamOptimizer(self.lr),
+                      'rmsprop': tf.train.RMSPropOptimizer(self.lr),
+                      'momentum': tf.train.MomentumOptimizer(self.lr, momentum=0.9)}
+
+        assert self.optimization_op in optimizers.keys(), "{} is a wrong optimization type. Available options are {}.".\
+            format(self.optimization_op, list(optimizers.keys()))
+
         opt = tf.train.AdamOptimizer(learning_rate=self.lr)
         # Unfortunately object detection pipeline tends to generate very high gradients that result in net
         # explosion. Therefore, to avoid this issue we need to calculate gradients and clip them. Afther that
