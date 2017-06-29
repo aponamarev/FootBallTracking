@@ -371,7 +371,7 @@ class ObjectDetectionNet(NetTemplate):
         """Define the training operation."""
         self._add_loss_summaries(self.loss)
 
-        optimizers = {'adam': tf.train.AdamOptimizer(self.lr),
+        optimizers = {'adam': tf.train.AdamOptimizer(self.lr, epsilon=1e-4),
                       'rmsprop': tf.train.RMSPropOptimizer(self.lr),
                       'momentum': tf.train.MomentumOptimizer(self.lr, momentum=0.9)}
 
