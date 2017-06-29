@@ -15,7 +15,8 @@ from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from tensorflow.python.platform.app import flags
 from src.COCO_DB import COCO
-from src.SmallNet import SmallNet as Net
+from src.SmallNet import SmallNet
+from src.AdvancedNet import AdvancedNet
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
 ANNOTATIONS_FILE = 'dataset/annotations/instances_train2014.json'
@@ -32,6 +33,7 @@ flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image
 flags.DEFINE_bool("debug", True, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
+flags.DEFINE_string("net", "small", "Set a net. Default SmallNet. Options are [small, advanced]")
 
 train_dir = FLAGS.train_dir
 learning_rate = FLAGS.learning_rate
@@ -47,6 +49,8 @@ summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
+Net = {'small': SmallNet, 'advanced': AdvancedNet}
+Net = Net[FLAGS.net]
 
 
 
