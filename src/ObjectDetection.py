@@ -382,7 +382,7 @@ class ObjectDetectionNet(NetTemplate):
         update_ops.extend(tf.get_collection("Assertion"))
         with tf.control_dependencies(update_ops):
 
-            opt = tf.train.AdamOptimizer(learning_rate=self.lr)
+            opt = optimizers[self.optimization_op]
             # Unfortunately object detection pipeline tends to generate very high gradients that result in net
             # explosion. Therefore, to avoid this issue we need to calculate gradients and clip them. Afther that
             # to finish off the optimization step, we will apply these clipped gradients.
