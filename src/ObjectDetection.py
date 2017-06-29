@@ -52,7 +52,7 @@ class ObjectDetectionNet(NetTemplate):
         self.WHK = self.K * self.outshape.x * self.outshape.y
         self.anchors = set_anchors(self.imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
-        self.EPSILON = 1e-16
+        self.EPSILON = 1e-8
         self.LOSS_COEF_BBOX = 5.0 # should be float
         self.LOSS_COEF_CLASS = 1.0 # should be float
         self.LOSS_COEF_CONF_POS = 75.0 # should be float
