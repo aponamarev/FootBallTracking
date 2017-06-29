@@ -34,6 +34,7 @@ flags.DEFINE_bool("debug", True, "Set to True to enter into a debugging mode. De
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
 flags.DEFINE_string("net", "small", "Set a net. Default SmallNet. Options are [small, advanced]")
+flags.DEFINE_float("width", 1.0, "Set the net width multiple. Default is 1.0. Type Float")
 
 train_dir = FLAGS.train_dir
 learning_rate = FLAGS.learning_rate
@@ -86,7 +87,7 @@ def train():
     graph = tf.Graph()
     with graph.as_default():
         with tf.device("gpu:{}".format(gpu_id)):
-            net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=0.5)
+            net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=FLAGS.width)
 
             # Create inputs
             im_ph = placeholder(dtype=tf.float32,shape=[*imshape[::-1], 3],name="img")
