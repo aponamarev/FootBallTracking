@@ -339,9 +339,9 @@ class ObjectDetectionNet(NetTemplate):
                 # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
                 # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
                 # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
-                conf_pos = tf.square(self.IoU - self.anchor_confidence)
+                conf_pos = tf.square(self.IoU - self.anchor_confidence, name="conf_delta")
                 self._assert_valid(conf_pos)
-                norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
+                norm = tf.identity(anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj), name="norm_conf")
                 self._assert_valid(norm)
 
                 self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
