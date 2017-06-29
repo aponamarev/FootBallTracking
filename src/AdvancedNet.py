@@ -103,10 +103,10 @@ class AdvancedNet(ObjectDetectionNet):
         c5 = upsampling(c4, 256, name="upsampling5")
         c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
         d5 = downsampling(c6, 256, name="downsampling5")
-        d5 = lateral_connection(d5, c5, name="l5")
+        d5 = lateral_connection(d5, c5, 128, name="l5")
         d4 = downsampling(d5, 128, name="downsampling4")
-        d4 = lateral_connection(d4, c4, name="l4")
+        d4 = lateral_connection(d4, c4, 64, name="l4")
         d3 = downsampling(d4, 64, name="downsampling3")
-        d3 = lateral_connection(d3, c3, name="l3")
+        d3 = lateral_connection(d3, c3, 64, name="l3")
 
         self.feature_map = separable_conv(d3, self.K * (self.n_classes + 4 + 1), name='feature_map')
