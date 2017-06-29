@@ -153,6 +153,7 @@ class ObjectDetectionNet(NetTemplate):
                                             [-1, n_classes])
                 # Softmax calculates probability distribution over the last dimension (classes)
                 P_class = nn.softmax(class_logits)
+                self._assert_valid(P_class)
                 self.P_class = reshape(P_class, [-1, WHK, n_classes], name="P")
 
             with variable_scope('confidence'):
@@ -165,6 +166,7 @@ class ObjectDetectionNet(NetTemplate):
                                             [-1, WHK])
                 # Estimate highest confidence
                 self.anchor_confidence = sigmoid(anchor_confidence, name="C")
+                self._assert_valid(self.anchor_confidence)
 
         with variable_scope('box'):
             """
@@ -175,32 +177,53 @@ class ObjectDetectionNet(NetTemplate):
 
             with variable_scope('stretching'):
                 dx, dy, dw, dh = unstack(self.detected_box_deltas, axis=2)
+                self._assert_valid(dx)
+                self._assert_valid(dy)
+                self._assert_valid(dh)
+                self._assert_valid(dw)
                 type_to_cast = dx.dtype.as_numpy_dtype
                 x = np.array(self.anchors[:, 0], dtype=type_to_cast) #0 is for x
+                #self._assert_valid(x)
                 y = np.array(self.anchors[:, 1], dtype=type_to_cast) #1 is for y
+                #self._assert_valid(y)
                 w = np.array(self.anchors[:, 2], dtype=type_to_cast) #2 is for w
+                #self._assert_valid(w)
                 h = np.array(self.anchors[:, 3], dtype=type_to_cast) #3 is for h
+                #self._assert_valid(h)
 
                 # let's copy the result of box adjustments
                 center_x = tf.add(x, dx * w, name='cx') #center_x = identity(x + dx * w, name='cx')
+                self._assert_valid(center_x)
                 center_y = tf.add(y, dy * h, name='cy') # center_y = identity(y + dy * h, name='cy')
+                self._assert_valid(center_y)
                 # exponent is used to undo the log used to pack box width and height
                 width = tf.multiply(w, safe_exp(dw, self.EXP_THRESH), name='bbox_width') # width = identity(w * safe_exp(dw, self.EXP_THRESH), name='bbox_width')
+                self._assert_valid(width)
                 # exponent is used to undo the log used to pack box width and height
                 height = tf.multiply(h, safe_exp(dh, self.EXP_THRESH), name='bbox_height') # height = identity(h * safe_exp(dh, self.EXP_THRESH), name='bbox_height')
+                self._assert_valid(height)
 
             with variable_scope('trimming'):
                 '''
                 This part makes sure that the predicted values do not extend beyond the images size
                 '''
                 xmin, ymin, xmax, ymax = bbox_transform([center_x, center_y, width, height])
+                self._assert_valid(xmin)
+                self._assert_valid(ymin)
+                self._assert_valid(xmax)
+                self._assert_valid(ymax)
                 xmin = tf.minimum(tf.maximum(0.0, xmin), np.float32(imshape.x - 1.0), name="xmin")
+                self._assert_valid(xmin)
                 xmax = tf.maximum(tf.minimum(np.float32(imshape.x - 1.0), xmax), 0.0, name="xmax")
+                self._assert_valid(xmax)
                 ymin = tf.minimum(tf.maximum(0.0, ymin), np.float32(imshape.x - 1.0), name="xmin")
+                self._assert_valid(ymin)
                 ymax = tf.maximum(tf.minimum(np.float32(imshape.y - 1.0), ymax), 0.0, name="xmax")
-
+                self._assert_valid(ymax)
                 det_box = stack(bbox_transform_inv([xmin, ymin, xmax, ymax]))
+                self._assert_valid(det_box)
                 self.det_boxes = tf.transpose(det_box, (1, 2, 0), name="box_prediction")
+                self._assert_valid(self.det_boxes)
                 tf.add_to_collection("predictions", self.det_boxes)
 
 
@@ -211,27 +234,41 @@ class ObjectDetectionNet(NetTemplate):
 
                 with tf.variable_scope('intersection'):
                     inters_xmin = tf.maximum(box1[0], box2[0], name='xmin')
+                    self._assert_valid(inters_xmin)
                     inters_ymin = tf.maximum(box1[1], box2[1], name='ymin')
+                    self._assert_valid(inters_ymin)
                     inters_xmax = tf.minimum(box1[2], box2[2], name='xmax')
+                    self._assert_valid(inters_xmax)
                     inters_ymax = tf.minimum(box1[3], box2[3], name='ymax')
+                    self._assert_valid(inters_ymax)
 
                     w = tf.maximum(0.0, inters_xmax - inters_xmin, name='inter_w')
+                    self._assert_valid(w)
                     h = tf.maximum(0.0, inters_ymax - inters_ymin, name='inter_h')
+                    self._assert_valid(h)
                     intersection = tf.multiply(w, h, name='intersection')
+                    self._assert_valid(intersection)
 
                 with tf.variable_scope('union'):
                     w1 = tf.subtract(box1[2], box1[0], name='w1')
+                    self._assert_valid(w1)
                     h1 = tf.subtract(box1[3], box1[1], name='h1')
+                    self._assert_valid(h1)
                     w2 = tf.subtract(box2[2], box2[0], name='w2')
+                    self._assert_valid(w2)
                     h2 = tf.subtract(box2[3], box2[1], name='h2')
+                    self._assert_valid(h2)
 
                     union = w1 * h1 + w2 * h2 - intersection
+                    self._assert_valid(union)
 
                 self.IoU = tf.multiply(intersection / (union + ɛ), reshape(mask, [-1, self.WHK]), name='IoU')
+                self._assert_valid(self.IoU)
 
             with variable_scope('probability'):
 
                 probs = tf.multiply(self.P_class, reshape(self.anchor_confidence, [-1, WHK, 1]), name='final_class_prob')
+                self._assert_valid(probs)
 
                 self.det_probs = tf.reduce_max(probs, 2, name='score')
                 tf.add_to_collection("predictions", self.det_probs)
@@ -278,49 +315,56 @@ class ObjectDetectionNet(NetTemplate):
         ɛ = self.EPSILON
 
         # If batch norm is used it is important to add dependency to update UPDATE_OPS before you do loss calc
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
 
-            with variable_scope('Loss'):
-                with variable_scope('P_class'):
+        with variable_scope('Loss'):
+            with variable_scope('P_class'):
 
-                    # cross-entropy: q * -log(p) + (1-q) * -log(1-p)
-                    # add a small value into log to prevent blowing up
-                    pos_CE = L * -tf.log(self.P_class + ɛ)
-                    neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
-                    self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask), n_obj, name='loss')
-                    # add to a collection called losses to sum those losses later
-                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
+                # cross-entropy: q * -log(p) + (1-q) * -log(1-p)
+                # add a small value into log to prevent blowing up
+                pos_CE = L * -tf.log(self.P_class + ɛ)
+                self._assert_valid(pos_CE)
+                neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
+                self._assert_valid(neg_CE)
+                self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask), n_obj, name='loss')
+                self._assert_valid(self.P_loss)
+                # add to a collection called losses to sum those losses later
+                tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)
 
-                with tf.variable_scope('Confidence'):
+            with tf.variable_scope('Confidence'):
 
-                    anchor_mask = reshape(mask, [-1, WHK])
-                    # TODO: Check if convergence will accelerate when calculating confidence as anchor_mask-anchor_confidence
-                    # at the moment confidence loss calculated as a difference between IoU (predicted based on deltas) and
-                    # anchor confidence. This loss function depends on the precision of your deltas that drive IoU. Therefore
-                    # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
-                    # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
-                    # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
-                    conf_pos = tf.square(self.IoU - self.anchor_confidence)
-                    norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
+                anchor_mask = reshape(mask, [-1, WHK])
+                # TODO: Check if convergence will accelerate when calculating confidence as anchor_mask-anchor_confidence
+                # at the moment confidence loss calculated as a difference between IoU (predicted based on deltas) and
+                # anchor confidence. This loss function depends on the precision of your deltas that drive IoU. Therefore
+                # confidence loss effectively embeds delta's optimization, while delta's loss being calculated separately
+                # below. Therefore, this may lead to a longer convergence. An alternative approach might be to calculate
+                # confidence loss separately (anchor_mask-anchor_confidence). This can potentially speedup the convergence.
+                conf_pos = tf.square(self.IoU - self.anchor_confidence)
+                self._assert_valid(conf_pos)
+                norm = anchor_mask * W_pos / n_obj + (1 - anchor_mask ) * W_neg / (WHK - n_obj)
+                self._assert_valid(norm)
 
-                    self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
+                self.conf_loss = reduce_mean(reduce_sum(conf_pos * norm, 1), name='loss')
+                self._assert_valid(self.conf_loss)
 
-                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
+                tf.add_to_collection(tf.GraphKeys.LOSSES, self.conf_loss)
 
-                with tf.variable_scope('BBox'):
+            with tf.variable_scope('BBox'):
 
-                    all_deltas = self.detected_box_deltas - self.input_box_delta
-                    pos_deltas = all_deltas * mask
-                    norm_deltas = reduce_sum(tf.square(pos_deltas))
-                    norm_deltas = truediv(norm_deltas, n_obj)
+                all_deltas = self.detected_box_deltas - self.input_box_delta
+                self._assert_valid(all_deltas)
+                pos_deltas = all_deltas * mask
+                self._assert_valid(pos_deltas)
+                norm_deltas = reduce_sum(tf.square(pos_deltas))
+                norm_deltas = truediv(norm_deltas, n_obj)
+                self._assert_valid(norm_deltas)
 
-                    self.bbox_loss = tf.multiply(W_bbox, norm_deltas, name='loss')
+                self.bbox_loss = tf.multiply(W_bbox, norm_deltas, name='loss')
 
-                    tf.add_to_collection(tf.GraphKeys.LOSSES, self.bbox_loss)
+                tf.add_to_collection(tf.GraphKeys.LOSSES, self.bbox_loss)
 
-                # add above losses as well as weight decay losses to form the total loss
-                self.loss = tf.add_n(tf.get_collection(tf.GraphKeys.LOSSES), name='total_loss')
+            # add above losses as well as weight decay losses to form the total loss
+            self.loss = tf.add_n(tf.get_collection(tf.GraphKeys.LOSSES), name='total_loss')
 
 
     def _add_train_graph(self):
@@ -334,18 +378,23 @@ class ObjectDetectionNet(NetTemplate):
         assert self.optimization_op in optimizers.keys(), "{} is a wrong optimization type. Available options are {}.".\
             format(self.optimization_op, list(optimizers.keys()))
 
-        opt = tf.train.AdamOptimizer(learning_rate=self.lr)
-        # Unfortunately object detection pipeline tends to generate very high gradients that result in net
-        # explosion. Therefore, to avoid this issue we need to calculate gradients and clip them. Afther that
-        # to finish off the optimization step, we will apply these clipped gradients.
-        gradients = opt.compute_gradients(self.loss)
-        capped_grads = [(tf.clip_by_value(grad, -self.MAX_GRAD_NORM, self.MAX_GRAD_NORM), var) for grad, var in gradients]
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        update_ops.extend(tf.get_collection("Assertion"))
+        with tf.control_dependencies(update_ops):
 
-        self.train_op = opt.apply_gradients(capped_grads)
-        tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
+            opt = tf.train.AdamOptimizer(learning_rate=self.lr)
+            # Unfortunately object detection pipeline tends to generate very high gradients that result in net
+            # explosion. Therefore, to avoid this issue we need to calculate gradients and clip them. Afther that
+            # to finish off the optimization step, we will apply these clipped gradients.
+            with tf.control_dependencies(tf.get_collection("Assertion")):
+                gradients = opt.compute_gradients(self.loss)
+                capped_grads = [(tf.clip_by_value(grad, -self.MAX_GRAD_NORM, self.MAX_GRAD_NORM), var) for grad, var in gradients]
 
-        for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
-            tf.summary.histogram(var.op.name, var)
+                self.train_op = opt.apply_gradients(capped_grads)
+                tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
+
+                for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
+                    tf.summary.histogram(var.op.name, var)
 
 
     def _add_loss_summaries(self, total_loss):

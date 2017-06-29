@@ -14,7 +14,6 @@ from os.path import join
 from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from tensorflow.python.platform.app import flags
-from tensorflow.python import debug as tf_debg
 from src.COCO_DB import COCO
 from src.SmallNet import SmallNet as Net
 
@@ -107,6 +106,7 @@ def train():
 
             net.optimization_op = FLAGS.optimizer
             net.setup_inputs(*dequeue_op)
+            net.debug = True
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()

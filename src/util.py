@@ -525,3 +525,7 @@ def dgb_viz(net, sess,  inputs):
                            final_lables, color=(255.0, 0.0, 0.0))
 
     return im
+
+def check_nan_or_inf(x, name=None):
+    tf.Assert(tf.is_inf(x) or tf.is_inf(x),
+              x, name=None)

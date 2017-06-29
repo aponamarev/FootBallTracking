@@ -21,6 +21,7 @@ class NetTemplate(object):
         self.total_loss=None
         self.optimization_op=None
         self.activations=[]
+        self.debug = True
 
 
     def fit(self, feed_dict):
@@ -69,8 +70,10 @@ class NetTemplate(object):
 
             conv = conv2d(inputs=inputs, num_outputs=filters, activation_fn=self._activation(),
                           kernel_size=kernel_size, stride=strides,padding=padding, scope=name)
+            self._assert_valid(conv)
             if BN_FLAG:
                 conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
+                self._assert_valid(conv)
 
         return conv
 
@@ -91,8 +94,11 @@ class NetTemplate(object):
                                     padding=padding,
                                     scope='depthwise_conv')
 
+            self._assert_valid(conv)
+
             if BN_FLAG:
                 conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
+                self._assert_valid(conv)
 
             conv = conv2d(inputs=conv,
                           num_outputs=filters,
@@ -100,8 +106,11 @@ class NetTemplate(object):
                           kernel_size=[1,1],
                           scope='pointwise_conv')
 
+            self._assert_valid(conv)
+
             if BN_FLAG:
                 conv = batch_norm(conv, is_training=self.is_training, scope='pointwise_batch_norm')
+                self._assert_valid(conv)
 
         return conv
 
@@ -111,6 +120,7 @@ class NetTemplate(object):
         with tf.variable_scope(name):
             conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding, activation=self._activation(),
                                               use_bias=bias, kernel_initializer=xavier_initializer(), name="deconv")
+            self._assert_valid(conv)
 
         return conv
 
@@ -216,3 +226,9 @@ class NetTemplate(object):
         tf.summary.histogram('{}_hist'.format(variable.op.name), variable)
         self.weights.append(variable)
         self.size.append(size)
+
+    def _assert_valid(self, x):
+        if self.debug:
+            check = tf.verify_tensor_all_finite(x, "incorrect value provided in {}".format(x.op.name), name=x.op.name + "/assert_nan_or_inf")
+            tf.add_to_collection("Assertion", check)
+
