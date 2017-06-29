@@ -58,6 +58,7 @@ def generate_sample(net):
         try:
             im, labels, bboxes = coco.get_sample()
             im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
+            assert len(mask)>0, "Invald sample - no objects."
             looking = False
         except:
             pass
