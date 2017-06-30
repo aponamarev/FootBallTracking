@@ -172,7 +172,7 @@ class NetTemplate(object):
         return tf.nn.avg_pool(inputs, kernel, strides, padding=padding, name=name)
 
     def _batch_norm(self, input, name=None, trainable=True):
-        return tf.cond(self.is_training,
+        return tf.cond(tf.equal(self.is_training, tf.constant(True)),
                        lambda: batch_norm(input, trainable=trainable, is_training=True, scope=name),
                        lambda: batch_norm(input, trainable=trainable, is_training=False, reuse=True, scope=name))
 
