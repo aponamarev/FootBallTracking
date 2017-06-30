@@ -490,7 +490,7 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
     """
 
     # Get box anch_ids
-    anch_ids = np.where(probs>PROB_THRESH)
+    anch_ids = np.where(probs>PROB_THRESH)[0]
     # Apply anch_ids to extract boxes, prob, classes
     final_boxes, final_probs, final_cls_idx = boxes[anch_ids], probs[anch_ids], cls_idx[anch_ids]
     # Limit the number of predictions

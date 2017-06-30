@@ -7,7 +7,7 @@ __author__ = "Alexander Ponamarev"
 __email__ = "alex.ponamaryov@gmail.com"
 
 
-from src.SmallNet import SmallNet
+from src.AdvancedNet import AdvancedNet as Net
 import tensorflow as tf
 from tensorflow import placeholder
 from src.util import check_path, resize_wo_scale_dist, draw_boxes, bbox_transform, filter_prediction
@@ -15,7 +15,7 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from matplotlib.pyplot import imshow
 
 
-path_to_net = 'logs/t5_new/model.ckpt'
+path_to_net = 'logs/adv1/model.ckpt'
 imshape = (320, 320)
 batch_size = 1
 
@@ -35,39 +35,38 @@ def main():
     # Create a graph that can place the net to both CPU and GPU
     graph = tf.Graph()
     with graph.as_default():
-        with tf.device("gpu:{}".format(gpu_id)):
-            net = SmallNet(coco_labels, imshape, width=0.5)
+        net = Net(coco_labels, imshape, width=0.5)
+        net.optimization_op = 'adam'
 
-            # Create input placeholders for the net
-            im_ph = placeholder(dtype=tf.float32, shape=[None,*imshape[::-1], 3], name="img")
-            labels_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, net.n_classes], name="labels")
-            mask_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 1], name="mask")
-            deltas_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 4], name="deltas_gt")
-            bbox_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 4], name="bbox_gt")
-            # Grouped those placeholder for ease of handling
-            inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
+        # Create input placeholders for the net
+        im_ph = placeholder(dtype=tf.float32, shape=[None,*imshape[::-1], 3], name="img")
+        labels_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, net.n_classes], name="labels")
+        mask_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 1], name="mask")
+        deltas_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 4], name="deltas_gt")
+        bbox_ph = placeholder(dtype=tf.float32, shape=[None,net.WHK, 4], name="bbox_gt")
+        # Grouped those placeholder for ease of handling
+        inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
 
-            net.setup_inputs(*inputs)
+        net.setup_inputs(*inputs)
 
-            # Initialize variables in the model and merge all summaries
-            initializer = tf.global_variables_initializer()
-            saver = tf.train.Saver(tf.global_variables())
+        # Initialize variables in the model and merge all summaries
+        initializer = tf.global_variables_initializer()
 
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            config.allow_soft_placement = True
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.allow_soft_placement = True
 
 
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
 
-    var_to_recover = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    saver = tf.train.Saver(var_to_recover, reshape=True)
+    restore_variables = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+    saver = tf.train.Saver(restore_variables, reshape=True)
     saver.restore(sess, path_to_net)
 
     for p in img_list:
         im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
-        im = process(im, net, sess, threshold=0.5, max_obj=50)
+        im = process(im, net, sess, threshold=0.51, max_obj=50)
         imshow(im)
 
 

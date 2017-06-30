@@ -52,7 +52,7 @@ class ObjectDetectionNet(NetTemplate):
         self.WHK = self.K * self.outshape.x * self.outshape.y
         self.anchors = set_anchors(self.imshape, self.outshape, anchor_shapes)
         self.EXP_THRESH = 1.0
-        self.EPSILON = 1e-12
+        self.EPSILON = 1e-16
         self.LOSS_COEF_BBOX = 5.0 # should be float
         self.LOSS_COEF_CLASS = 1.0 # should be float
         self.LOSS_COEF_CONF_POS = 75.0 # should be float
@@ -309,7 +309,7 @@ class ObjectDetectionNet(NetTemplate):
         W_pos = self.LOSS_COEF_CONF_POS # weight of confidence loss in positive examples
         W_neg = self.LOSS_COEF_CONF_NEG # weight of confidence loss in negative examples
         n_obj = reduce_sum(mask) # number of target objects in an image - used to normalize loss
-        tf.summary.scalar("num_objects", n_obj)
+        tf.summary.scalar("num_objects", reduce_mean(reduce_sum(mask,1)))
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
         ɛ = self.EPSILON

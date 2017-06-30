@@ -72,7 +72,7 @@ class NetTemplate(object):
                           kernel_size=kernel_size, stride=strides,padding=padding, scope=name)
             self._assert_valid(conv)
             if BN_FLAG:
-                conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
+                conv = self._batch_norm(conv, name='conv_bn')
                 self._assert_valid(conv)
 
         return conv
@@ -97,7 +97,7 @@ class NetTemplate(object):
             self._assert_valid(conv)
 
             if BN_FLAG:
-                conv = batch_norm(conv, is_training=self.is_training, scope='depthwise_batch_norm')
+                conv = self._batch_norm(conv, name='depthwise_bn')
                 self._assert_valid(conv)
 
             conv = conv2d(inputs=conv,
@@ -109,18 +109,22 @@ class NetTemplate(object):
             self._assert_valid(conv)
 
             if BN_FLAG:
-                conv = batch_norm(conv, is_training=self.is_training, scope='pointwise_batch_norm')
+                conv = self._batch_norm(conv, name='pointwise_bn')
                 self._assert_valid(conv)
 
         return conv
 
 
-    def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True):
+    def _deconv(self, input, filters, kernel_size, strides=[2,2], padding="SAME", name="deconv", bias=True, BN_FLAG=True):
 
         with tf.variable_scope(name):
             conv = tf.layers.conv2d_transpose(input, filters, kernel_size, strides, padding, activation=self._activation(),
                                               use_bias=bias, kernel_initializer=xavier_initializer(), name="deconv")
             self._assert_valid(conv)
+
+            if BN_FLAG:
+                conv = self._batch_norm(conv, name='deconv_bn')
+                self._assert_valid(conv)
 
         return conv
 
@@ -167,8 +171,10 @@ class NetTemplate(object):
     def _avg_pool(self, inputs, kernel=[1,2,2,1], strides=[1,2,2,1], padding="VALID", name = "max_pool"):
         return tf.nn.avg_pool(inputs, kernel, strides, padding=padding, name=name)
 
-    def _batch_norm(self, input, name, trainable=True):
-        return batch_norm(input, trainable=trainable, is_training=self.is_training)
+    def _batch_norm(self, input, name=None, trainable=True):
+        return tf.cond(self.is_training,
+                       lambda: batch_norm(input, trainable=trainable, is_training=True, scope=name),
+                       lambda: batch_norm(input, trainable=trainable, is_training=False, reuse=True, scope=name))
 
     def _drop_out_fullyconnected(self, input, name):
         return tf.nn.dropout(input, self.dropout_rate, name=name)

@@ -16,7 +16,7 @@ from .ObjectDetection import ObjectDetectionNet
 
 Point = namedtuple('Point',['x', 'y'])
 
-class SmallNet(ObjectDetectionNet):
+class Net(ObjectDetectionNet):
 
     def __init__(self, labels_provided, imshape, lr=1e-3, activations='elu', width=1.0):
 

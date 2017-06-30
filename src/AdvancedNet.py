@@ -23,7 +23,7 @@ class AdvancedNet(ObjectDetectionNet):
         self.width=width
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
+        self.outshape = Point(int(imshape[0] / 16), int(imshape[1] / 16))
 
         super().__init__(labels_provided, lr)
 
@@ -96,15 +96,18 @@ class AdvancedNet(ObjectDetectionNet):
 
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
-        c1 = conv(inputs, 8, BN_FLAG=False, name='conv1')
+        c1 = conv(inputs, 8, strides=2, BN_FLAG=False, name='conv1')
         c2 = separable_conv(c1, 32, BN_FLAG=True, strides=2, name='conv2')
-        c3 = upsampling(c2, 64, name="upsampling3")
+        c3 = upsampling(c2, 64, name="up3")
         c4 = separable_conv(c3, 128, BN_FLAG=True, strides=2, name='conv4')
-        c5 = upsampling(c4, 256, name="upsampling5")
+        c5 = upsampling(c4, 256, name="up5")
         c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
-        d5 = downsampling(c6, 256, name="downsampling5")
-        d5 = lateral_connection(d5, c5, 128, name="l5")
-        d4 = downsampling(d5, 128, name="downsampling4")
-        d4 = lateral_connection(d4, c4, 64, name="l4")
+        d5 = downsampling(c6, 256, name="down5")
+        d5 = lateral_connection(d5, c5, 256, name="l5")
+        d4 = downsampling(d5, 128, name="down4")
+        d4 = lateral_connection(d4, c4, 128, name="l4")
+        d3 = downsampling(d4, 64, name="down3")
+        d3 = lateral_connection(d3, c3, 64, name="l3")
 
-        self.feature_map = separable_conv(d4, self.K * (self.n_classes + 4 + 1), name='feature_map')
+
+        self.feature_map = separable_conv(d3, self.K * (self.n_classes + 4 + 1), strides=2, name='feature_map')

@@ -15,7 +15,7 @@ from tqdm import trange
 from tensorflow import placeholder, FIFOQueue
 from tensorflow.python.platform.app import flags
 from src.COCO_DB import COCO
-from src.SmallNet import SmallNet
+from src.SmallNet import Net
 from src.AdvancedNet import AdvancedNet
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
@@ -33,7 +33,7 @@ flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image
 flags.DEFINE_bool("debug", True, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
-flags.DEFINE_string("net", "small", "Set a net. Default SmallNet. Options are [small, advanced]")
+flags.DEFINE_string("net", "advanced", "Set a net. Default SmallNet. Options are [small, advanced]")
 flags.DEFINE_float("width", 1.0, "Set the net width multiple. Default is 1.0. Type Float")
 
 train_dir = FLAGS.train_dir
@@ -50,7 +50,7 @@ summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
-Net = {'small': SmallNet, 'advanced': AdvancedNet}
+Net = {'small': Net, 'advanced': AdvancedNet}
 Net = Net[FLAGS.net]
 
 
@@ -63,10 +63,6 @@ def generate_sample(net):
         try:
             im, labels, bboxes = coco.get_sample()
             im, labels, mask, deltas, bboxes = net.preprocess_COCO(im, labels, bboxes)
-            assert len(mask)>0, "Invald sample - no mask."
-            assert len(labels)>0, "Invald sample - no labels."
-            assert len(deltas)>0, "Invald sample - no deltas."
-            assert len(bboxes)>0, "Invald sample - no bboxes."
             looking = False
         except:
             pass
@@ -115,7 +111,7 @@ def train():
 
             net.optimization_op = FLAGS.optimizer
             net.setup_inputs(*dequeue_op)
-            net.debug = True
+            net.debug = FLAGS.debug
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
@@ -148,7 +144,7 @@ def train():
     for step in pbar:
 
         # Configure operation that TF should run depending on the step number
-        if step % summary_step == 0:
+        if step % summary_step == summary_step-1:
             op_list = [net.train_op, net.loss, summary_op, net.P_loss, net.conf_loss, net.bbox_loss]
 
             _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list, feed_dict={net.is_training: False})
@@ -168,25 +164,23 @@ def train():
             pass_tracker_prior = pass_tracker_end
             prior_step = step
 
+        # Save the model checkpoint periodically.
+        elif step % checkpoint_step == 0 or step == max_steps:
+            checkpoint_path = join(train_dir, 'model.ckpt')
+            saver.save(sess, checkpoint_path)
+
         else:
 
             _, loss_value, conf_loss, bbox_loss, class_loss = \
-                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss],
-                         feed_dict={net.is_training: True}) # , feed_dict={net.dropout_rate: 0.75}
+                sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss], feed_dict={net.is_training: True})
 
             pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
                              class_loss="{:.1f}%".format(class_loss*100),
                              total_loss="{:.2f}".format(loss_value))
 
-        assert not np.isnan(loss_value), \
-            'Model diverged. Total loss: {}, conf_loss: {}, bbox_loss: {}, ' \
-            'class_loss: {}'.format(loss_value, conf_loss, bbox_loss, class_loss)
-
-        # Save the model checkpoint periodically.
-        if step % checkpoint_step == 0 or step == max_steps:
-            summary_writer.add_summary(summary_str, step)
-            checkpoint_path = join(train_dir, 'model.ckpt')
-            saver.save(sess, checkpoint_path)
+            assert not np.isnan(loss_value), \
+                'Model diverged. Total loss: {}, conf_loss: {}, bbox_loss: {}, ' \
+                'class_loss: {}'.format(loss_value, conf_loss, bbox_loss, class_loss)
 
     # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.
     sess.run(queue.close(cancel_pending_enqueues=True))
