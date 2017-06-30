@@ -173,8 +173,8 @@ class NetTemplate(object):
 
     def _batch_norm(self, input, name=None, trainable=True):
         return tf.cond(tf.equal(self.is_training, tf.constant(True)),
-                       lambda: batch_norm(input, trainable=trainable, is_training=True, scope=name),
-                       lambda: batch_norm(input, trainable=trainable, is_training=False, reuse=True, scope=name))
+                       lambda: batch_norm(input, trainable=trainable, is_training=True, updates_collections=None, scope=name),
+                       lambda: batch_norm(input, trainable=trainable, is_training=False, reuse=True, updates_collections=None, scope=name))
 
     def _drop_out_fullyconnected(self, input, name):
         return tf.nn.dropout(input, self.dropout_rate, name=name)
