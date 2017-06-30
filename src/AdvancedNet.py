@@ -23,7 +23,7 @@ class AdvancedNet(ObjectDetectionNet):
         self.width=width
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 4), int(imshape[1] / 4))
+        self.outshape = Point(int(imshape[0] / 8), int(imshape[1] / 8))
 
         super().__init__(labels_provided, lr)
 
@@ -106,7 +106,5 @@ class AdvancedNet(ObjectDetectionNet):
         d5 = lateral_connection(d5, c5, 128, name="l5")
         d4 = downsampling(d5, 128, name="downsampling4")
         d4 = lateral_connection(d4, c4, 64, name="l4")
-        d3 = downsampling(d4, 64, name="downsampling3")
-        d3 = lateral_connection(d3, c3, 64, name="l3")
 
-        self.feature_map = separable_conv(d3, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(d4, self.K * (self.n_classes + 4 + 1), name='feature_map')
