@@ -125,14 +125,15 @@ def train():
     config.allow_soft_placement = True
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
+    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
     if restore_model:
         saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
         saver.restore(sess, join(train_dir, 'model.ckpt'))
 
     tf.train.start_queue_runners(sess=sess, coord=coord)
-    threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
-               for _ in range(prefetching_threads)]
+    [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
+     for _ in range(prefetching_threads)]
 
     pass_tracker_start = time.time()
     pass_tracker_prior = pass_tracker_start

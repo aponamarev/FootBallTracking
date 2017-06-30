@@ -84,16 +84,6 @@ class AdvancedNet(ObjectDetectionNet):
 
         with name_scope('inputs'):
 
-            tf.summary.image("imgs", inputs, max_outputs=2)
-
-            inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
-
-
-
-        with name_scope('inputs'):
-
-            tf.summary.image("imgs", inputs, max_outputs=2)
-
             inputs = tf.subtract( tf.divide(inputs, 255.0), 0.5, name="img_norm")
 
         c1 = conv(inputs, 8, strides=2, BN_FLAG=False, name='conv1')

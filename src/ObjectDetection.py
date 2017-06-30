@@ -309,7 +309,10 @@ class ObjectDetectionNet(NetTemplate):
         W_pos = self.LOSS_COEF_CONF_POS # weight of confidence loss in positive examples
         W_neg = self.LOSS_COEF_CONF_NEG # weight of confidence loss in negative examples
         n_obj = reduce_sum(mask) # number of target objects in an image - used to normalize loss
-        tf.summary.scalar("num_objects", reduce_mean(reduce_sum(mask,1)))
+        n_obj_per_batch = reduce_sum(mask, 1)
+        tf.summary.scalar("n_objects/avg", reduce_mean(n_obj_per_batch))
+        tf.summary.scalar("n_objects/min", tf.reduce_min(n_obj_per_batch))
+        tf.summary.scalar("n_objects/max", tf.reduce_max(n_obj_per_batch))
         WHK = self.WHK # feature map width * height * K anchors per cell
         L = self.input_labels
         ɛ = self.EPSILON
