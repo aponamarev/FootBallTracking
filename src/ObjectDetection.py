@@ -384,18 +384,20 @@ class ObjectDetectionNet(NetTemplate):
         with tf.control_dependencies(update_ops):
 
             opt = optimizers[self.optimization_op]
+            """
             # Unfortunately object detection pipeline tends to generate very high gradients that result in net
             # explosion. Therefore, to avoid this issue we need to calculate gradients and clip them. Afther that
             # to finish off the optimization step, we will apply these clipped gradients.
-            with tf.control_dependencies(tf.get_collection("Assertion")):
-                gradients = opt.compute_gradients(self.loss)
-                capped_grads = [(tf.clip_by_value(grad, -self.MAX_GRAD_NORM, self.MAX_GRAD_NORM), var) for grad, var in gradients]
+            gradients = opt.compute_gradients(self.loss)
+            capped_grads = [(tf.clip_by_value(grad, -self.MAX_GRAD_NORM, self.MAX_GRAD_NORM), var) for grad, var in gradients]
 
-                self.train_op = opt.apply_gradients(capped_grads)
-                tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
+            self.train_op = opt.apply_gradients(capped_grads)
+            """
+            self.train_op = opt.minimize(self.loss)
+            tf.add_to_collection(tf.GraphKeys.TRAIN_OP, self.train_op)
 
-                for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
-                    tf.summary.histogram(var.op.name, var)
+            for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
+                tf.summary.histogram(var.op.name, var)
 
 
     def _add_loss_summaries(self, total_loss):
