@@ -424,7 +424,7 @@ class ObjectDetectionNet(NetTemplate):
     def infer(self, X_batch, sess):
         p = Predictions(*sess.run([self.det_boxes, self.det_probs, self.det_class],
                                   feed_dict={self.input_img: np.expand_dims(X_batch, 0),
-                                             self.is_training: False}))
+                                             self.is_training: False, self.dropout_rate: 1.0}))
         return p
 
 

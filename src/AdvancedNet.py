@@ -41,6 +41,7 @@ class AdvancedNet(ObjectDetectionNet):
         maxpool = self._max_pool
         bn = self._batch_norm
         fc = self._fullyconnected
+        drop_out = self._drop_out_conv
 
         def upsampling(input, filters, name):
 
@@ -98,6 +99,7 @@ class AdvancedNet(ObjectDetectionNet):
         d4 = lateral_connection(d4, c4, 128, name="l4")
         d3 = downsampling(d4, 64, name="down3")
         d3 = lateral_connection(d3, c3, 64, name="l3")
+        d3 = drop_out(d3, "d3_dropout")
 
 
         self.feature_map = separable_conv(d3, self.K * (self.n_classes + 4 + 1), strides=2, name='feature_map')
