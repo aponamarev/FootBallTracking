@@ -43,7 +43,7 @@ batch_sz=FLAGS.batch_size
 imshape=(FLAGS.resolution, FLAGS.resolution)
 
 queue_capacity = batch_sz * 5
-prefetching_threads = 2
+prefetching_threads = 4
 gpu_id = 0
 
 summary_step = 100
@@ -99,8 +99,8 @@ def train():
             queue = RandomShuffleQueue(capacity=queue_capacity, min_after_dequeue= 2*batch_sz,
                                        dtypes=[v.dtype for v in inputs], shapes=shapes)
             enqueue_op = queue.enqueue(inputs)
-            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=queue_capacity,
-                                        shapes=shapes, name="Batch_{}_samples".format(batch_sz))
+            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, num_threads=prefetching_threads,
+                                        capacity=queue_capacity, shapes=shapes, name="Batch_{}_samples".format(batch_sz))
 
             net.optimization_op = FLAGS.optimizer
             net.setup_inputs(*dequeue_op)
