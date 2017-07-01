@@ -81,7 +81,7 @@ def enqueue_thread(coord, sess, net, enqueue_op, inputs):
 def train():
 
     graph = tf.Graph()
-    with graph.as_default():
+    with graph.as_default() as g:
         with tf.device("gpu:{}".format(gpu_id)):
             net = Net(coco_labels, imshape, learning_rate, activations=FLAGS.activations, width=FLAGS.width)
 
@@ -108,16 +108,17 @@ def train():
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
-        saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
+        saver = tf.train.Saver(g.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
 
         summary_op = tf.summary.merge_all()
-        summary_writer = tf.summary.FileWriter(train_dir, graph)
+        summary_writer = tf.summary.FileWriter(train_dir, g)
 
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    config.allow_soft_placement = True
-    sess = tf.Session(config=config, graph=graph)
-    sess.run(initializer)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.allow_soft_placement = True
+
+        sess = tf.Session(config=config, graph=g)
+        sess.run(initializer)
 
     # Launch coordinator that will manage threads
     coord = tf.train.Coordinator()
@@ -127,7 +128,7 @@ def train():
 
 
     if restore_model:
-        saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
+        saver = tf.train.Saver(sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES), reshape=True)
         saver.restore(sess, join(train_dir, 'model.ckpt'))
 
     pass_tracker_start = time.time()
