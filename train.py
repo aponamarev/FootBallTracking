@@ -12,7 +12,7 @@ import numpy as np
 import time
 from os.path import join
 from tqdm import trange
-from tensorflow import placeholder, FIFOQueue
+from tensorflow import placeholder, RandomShuffleQueue
 from tensorflow.python.platform.app import flags
 from src.COCO_DB import COCO
 from src.SmallNet import Net
@@ -27,10 +27,10 @@ coco_labels=[1, 2, 3, 4]
 FLAGS = flags.FLAGS
 flags.DEFINE_string("train_dir", "logs/t1", "Provide training directory for recovering and storing model. Default value is logs/t6")
 flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. Default value is 1e-3")
-flags.DEFINE_bool("restore", False, "Do you want to restore a model? Default value is False.")
+flags.DEFINE_bool("restore", True, "Do you want to restore a model? Default value is True.")
 flags.DEFINE_integer("batch_size", 128, "Provide a size of the minibatch. Default value is 128.")
 flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
-flags.DEFINE_bool("debug", True, "Set to True to enter into a debugging mode. Default value is False.")
+flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
 flags.DEFINE_string("net", "advanced", "Set a net. Default SmallNet. Options are [small, advanced]")
@@ -42,7 +42,7 @@ restore_model = FLAGS.restore
 batch_sz=FLAGS.batch_size
 imshape=(FLAGS.resolution, FLAGS.resolution)
 
-queue_capacity = batch_sz * 4
+queue_capacity = batch_sz * 5
 prefetching_threads = 2
 gpu_id = 0
 
@@ -96,18 +96,11 @@ def train():
 
             # Create a queue that will be prefetching samples
             shapes = [v.get_shape().as_list() for v in inputs]
-            queue = FIFOQueue(capacity=queue_capacity,
-                              dtypes=[v.dtype for v in inputs],
-                              shapes=shapes)
-            # It is interesting to monitor the size of the buffer
-            q_size = queue.size()
-            tf.summary.scalar("prefetching_queue_size", q_size)
+            queue = RandomShuffleQueue(capacity=queue_capacity, min_after_dequeue= 2*batch_sz,
+                                       dtypes=[v.dtype for v in inputs], shapes=shapes)
             enqueue_op = queue.enqueue(inputs)
-            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=int(queue_capacity),
-                                        shapes=shapes, name="Batch_{}_samples".format(batch_sz),
-                                        num_threads=prefetching_threads)
-            # Launch coordinator that will manage threads
-            coord = tf.train.Coordinator()
+            dequeue_op = tf.train.batch(queue.dequeue(), batch_sz, capacity=queue_capacity,
+                                        shapes=shapes, name="Batch_{}_samples".format(batch_sz))
 
             net.optimization_op = FLAGS.optimizer
             net.setup_inputs(*dequeue_op)
@@ -125,15 +118,17 @@ def train():
     config.allow_soft_placement = True
     sess = tf.Session(config=config, graph=graph)
     sess.run(initializer)
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    # Launch coordinator that will manage threads
+    coord = tf.train.Coordinator()
+    tf.train.start_queue_runners(sess=sess, coord=coord)
+    threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
+     for _ in range(prefetching_threads)]
+
 
     if restore_model:
         saver = tf.train.Saver(graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
         saver.restore(sess, join(train_dir, 'model.ckpt'))
-
-    tf.train.start_queue_runners(sess=sess, coord=coord)
-    [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
-     for _ in range(prefetching_threads)]
 
     pass_tracker_start = time.time()
     pass_tracker_prior = pass_tracker_start
