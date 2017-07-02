@@ -81,7 +81,7 @@ def define_net():
     return sess, net
 
 
-def process(img, threshold=0.52, max_obj=20):
+def process(img, threshold=0.6, max_obj=20, target_class_index=0):
 
 
     img, _ = resize_wo_scale_dist(img, imshape)
@@ -89,10 +89,15 @@ def process(img, threshold=0.52, max_obj=20):
 
     for i in range(len(p.bboxes)):
 
+        class_indices = np.nonzero(p.classes[i]==target_class_index)[0]
+        bboxes = p.bboxes[i][class_indices]
+        conf = p.conf[i][class_indices]
+        classes = p.classes[i][class_indices]
+
         label = []
 
         final_boxes, final_probs, final_cls_idx = \
-            filter_prediction(p.bboxes[i], p.conf[i], p.classes[i],
+            filter_prediction(bboxes, conf, classes,
                               PROB_THRESH=threshold, TOP_N_DETECTIONS=max_obj, n_classes=len(coco_labels))
         for box_id in range(len(final_boxes)):
             kernel_id = final_cls_idx[box_id]

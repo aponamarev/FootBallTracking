@@ -448,7 +448,7 @@ def map_deltas(a, d):
 
 
 
-def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, PROB_THRESH=0.52, NMS_THRESH=0.1):
+def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, PROB_THRESH=0.52, NMS_THRESH=0.2):
     """Filter bounding box predictions with probability threshold and
     non-maximum supression.
     Args:

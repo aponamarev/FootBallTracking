@@ -23,7 +23,7 @@ class Net(ObjectDetectionNet):
         self.width=width
 
         self.imshape = Point(*imshape)
-        self.outshape = Point(int(imshape[0] / 32), int(imshape[1] / 32))
+        self.outshape = Point(int(imshape[0] / 64), int(imshape[1] / 64))
 
         super().__init__(labels_provided, lr)
 
@@ -83,19 +83,13 @@ class Net(ObjectDetectionNet):
 
         with name_scope('inputs'):
 
-            tf.summary.image("imgs", inputs, max_outputs=2)
-
             inputs = tf.subtract( tf.divide(inputs, 127.5), 1.0, name="img_norm")
 
-        c = conv(inputs, 8, BN_FLAG=False, name='conv1')
-        c = separable_conv(c, 32, BN_FLAG=True, strides=2, name='conv2')
-        c = separable_conv(c, int(32*self.width), BN_FLAG=True, name='conv3')
-        c = separable_conv(c, int(64*self.width), BN_FLAG=True, strides=2, name='conv4')
-        c = separable_conv(c, int(64*self.width), BN_FLAG=True, name='conv5')
-        c = separable_conv(c, int(128*self.width), BN_FLAG=True, strides=2, name='conv6')
-        c = separable_conv(c, int(128*self.width), BN_FLAG=True, name='conv7')
-        c = separable_conv(c, int(256*self.width), BN_FLAG=True, strides=2, name='conv8')
-        c = separable_conv(c, int(256*self.width), BN_FLAG=True, name='conv9')
-        c = separable_conv(c, int(512*self.width), BN_FLAG=True, strides=2, name='conv10')
+        c1 = conv(inputs, 8, strides=2, BN_FLAG=False, name='conv1')
+        c2 = separable_conv(c1, 32, BN_FLAG=True, strides=2, name='conv2')
+        c3 = upsampling(c2, 64, name="up3")
+        c4 = separable_conv(c3, 128, BN_FLAG=True, strides=2, name='conv4')
+        c5 = upsampling(c4, 256, name="up5")
+        c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
 
-        self.feature_map = separable_conv(c, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(c6, self.K * (self.n_classes + 4 + 1), name='feature_map')
