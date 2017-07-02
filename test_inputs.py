@@ -13,8 +13,8 @@ from matplotlib import pyplot as plt
 from tensorflow import placeholder, FIFOQueue
 from tensorflow.python.platform.app import flags
 from src.COCO_DB import COCO
-from src.AdvancedNet import AdvancedNet as Net
 from src.AdvancedNet import AdvancedNet
+from src.SmallNet import Net as SmallNet
 from src.util import filter_prediction, bbox_transform, draw_boxes
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
@@ -49,7 +49,7 @@ summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
-Net = {'small': Net, 'advanced': AdvancedNet}
+Net = {'small': SmallNet, 'advanced': AdvancedNet}
 Net = Net[FLAGS.net]
 
 
@@ -146,10 +146,9 @@ def train():
                 kernel_id = int(np.argmax(final_cls_idx[box_id]))
                 label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))
 
-            img = draw_boxes(ims[i], list(map(lambda x: bbox_transform(x), final_boxes)), label,
-                             thickness=1, fontScale=0.5)
+            img = draw_boxes(ims[i], bbox_transform(np.hsplit(final_boxes, 4)), label, thickness=1, fontScale=0.5)
 
-            plt.imshow(img)
+            plt.imshow(img.astype(np.uint8))
 
 
     # Close a queue and cancel all elements in the queue. Request coordinator to stop all the threads.

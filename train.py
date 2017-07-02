@@ -146,7 +146,7 @@ def train():
 
             _, loss_value, summary_str, class_loss, conf_loss, bbox_loss = sess.run(op_list,
                                                                                     feed_dict={net.is_training: False,
-                                                                                               net.dropout_rate: 1.0})
+                                                                                               net.keep_prob: 1.0})
 
             pass_tracker_end = time.time()
 
@@ -172,7 +172,7 @@ def train():
 
             _, loss_value, conf_loss, bbox_loss, class_loss = \
                 sess.run([net.train_op, net.loss, net.conf_loss, net.bbox_loss, net.P_loss], feed_dict={net.is_training: True,
-                                                                                                        net.dropout_rate: 0.75})
+                                                                                                        net.keep_prob: 0.75})
 
             pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
                              class_loss="{:.1f}%".format(class_loss*100),

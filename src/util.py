@@ -127,9 +127,7 @@ def draw_boxes(img, boxes_xmin_ymin_xmax_ymax, labels, thickness=2, fontFace=FON
     :return: img
     """
 
-    for b,l in zip(boxes_xmin_ymin_xmax_ymax, labels):
-
-        xmin, ymin, xmax, ymax = b
+    for xmin, ymin, xmax, ymax, l in zip(*boxes_xmin_ymin_xmax_ymax, labels):
 
         top_left = (int(xmin), int(ymin))
         bottom_right = (int(xmax), int(ymax))

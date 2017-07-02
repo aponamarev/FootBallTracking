@@ -10,8 +10,8 @@ class NetTemplate(object):
                  dtype=tf.float32):
         self.weights = []
         self.size = []
-        self.dropout_rate = tf.placeholder(dtype=tf.float32, shape=[], name="dropout")
-        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.dropout_rate)
+        self.keep_prob = tf.placeholder(dtype=tf.float32, shape=[], name="dropout")
+        tf.add_to_collection(tf.GraphKeys.RESOURCES, self.keep_prob)
         self.is_training = tf.placeholder(dtype=tf.bool, shape=[], name="is_training")
         tf.add_to_collection(tf.GraphKeys.RESOURCES, self.is_training)
         self.default_activation = default_activation
@@ -177,7 +177,7 @@ class NetTemplate(object):
                        lambda: batch_norm(input, trainable=trainable, is_training=False, reuse=True, updates_collections=None, scope=name))
 
     def _drop_out_fullyconnected(self, input, name):
-        return tf.nn.dropout(input, self.dropout_rate, name=name)
+        return tf.nn.dropout(input, self.keep_prob, name=name)
 
     def _drop_out_conv(self, input, name):
         shape = input.get_shape().as_list()
