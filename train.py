@@ -175,7 +175,7 @@ def train():
                                                                                                         net.keep_prob: 0.75})
 
             pbar.set_postfix(bbox_loss="{:.1f}".format(bbox_loss),
-                             class_loss="{:.1f}%".format(class_loss*100),
+                             class_loss="{:.1f}%".format(class_loss),
                              total_loss="{:.2f}".format(loss_value))
 
             assert not np.isnan(loss_value), \
