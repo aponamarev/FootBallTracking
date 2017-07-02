@@ -81,7 +81,7 @@ def define_net():
     return sess, net
 
 
-def process(img, threshold=0.6, max_obj=20):
+def process(img, threshold=0.52, max_obj=20):
 
 
     img, _ = resize_wo_scale_dist(img, imshape)

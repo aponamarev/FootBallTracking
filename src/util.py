@@ -448,7 +448,7 @@ def map_deltas(a, d):
 
 
 
-def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, PROB_THRESH=0.5, NMS_THRESH=0.1):
+def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, PROB_THRESH=0.52, NMS_THRESH=0.1):
     """Filter bounding box predictions with probability threshold and
     non-maximum supression.
     Args:
@@ -461,16 +461,16 @@ def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, P
       final_cls_idx: array of filtered class indices
     """
 
+    filtered_idx = np.nonzero(probs > PROB_THRESH)[0]
+    probs = probs[filtered_idx]
+    boxes = boxes[filtered_idx]
+    cls_idx = cls_idx[filtered_idx]
+
     if TOP_N_DETECTIONS < len(probs) and TOP_N_DETECTIONS > 0:
         order = probs.argsort()[:-TOP_N_DETECTIONS - 1:-1]
         probs = probs[order]
         boxes = boxes[order]
         cls_idx = cls_idx[order]
-    else:
-        filtered_idx = np.nonzero(probs > PROB_THRESH)[0]
-        probs = probs[filtered_idx]
-        boxes = boxes[filtered_idx]
-        cls_idx = cls_idx[filtered_idx]
 
     final_boxes = []
     final_probs = []

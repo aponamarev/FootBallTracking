@@ -54,7 +54,7 @@ class ObjectDetectionNet(NetTemplate):
         self.EXP_THRESH = 1.0
         self.EPSILON = 1e-16
         self.LOSS_COEF_BBOX = 5.0 # should be float
-        self.LOSS_COEF_CLASS = 10.0 # should be float
+        self.LOSS_COEF_CLASS = 50.0 # 50 converts loss (which is double the error) into percentage points. Should be float
         self.LOSS_COEF_CONF_POS = 75.0 # should be float
         self.LOSS_COEF_CONF_NEG = 100.0 # should be float
         self.input_img = None
@@ -328,7 +328,7 @@ class ObjectDetectionNet(NetTemplate):
                 self._assert_valid(pos_CE)
                 neg_CE = (1-L) * -tf.log(1 - self.P_class + ɛ)
                 self._assert_valid(neg_CE)
-                self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask)/2, n_obj, name='loss')
+                self.P_loss = truediv(W_ce * reduce_sum((pos_CE + neg_CE) * mask), n_obj, name='loss')
                 self._assert_valid(self.P_loss)
                 # add to a collection called losses to sum those losses later
                 tf.add_to_collection(tf.GraphKeys.LOSSES, self.P_loss)

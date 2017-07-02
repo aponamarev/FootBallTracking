@@ -72,7 +72,7 @@ def main():
 
 
 
-def process(img, net, sess, threshold=0.5, max_obj=50):
+def process(img, net, sess, threshold=0.52, max_obj=50):
 
 
 
