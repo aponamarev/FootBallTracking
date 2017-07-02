@@ -448,7 +448,7 @@ def map_deltas(a, d):
 
 
 
-def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.5):
+def filter_prediction(boxes, probs, cls_idx, n_classes=4, TOP_N_DETECTIONS=30, PROB_THRESH=0.5, NMS_THRESH=0.1):
     """Filter bounding box predictions with probability threshold and
     non-maximum supression.
     Args:
@@ -461,7 +461,6 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
       final_cls_idx: array of filtered class indices
     """
 
-    """
     if TOP_N_DETECTIONS < len(probs) and TOP_N_DETECTIONS > 0:
         order = probs.argsort()[:-TOP_N_DETECTIONS - 1:-1]
         probs = probs[order]
@@ -477,7 +476,7 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
     final_probs = []
     final_cls_idx = []
 
-    for c in range(self.n_classes):
+    for c in range(n_classes):
         idx_per_class = [i for i in range(len(probs)) if cls_idx[i] == c]
         keep = nms(boxes[idx_per_class], probs[idx_per_class], NMS_THRESH)
         for i in range(len(keep)):
@@ -485,18 +484,8 @@ def filter_prediction(boxes, probs, cls_idx, TOP_N_DETECTIONS=50, PROB_THRESH=0.
                 final_boxes.append(boxes[idx_per_class[i]])
                 final_probs.append(probs[idx_per_class[i]])
                 final_cls_idx.append(c)
-    """
 
-    # Get box anch_ids
-    anch_ids = np.where(probs>PROB_THRESH)[0]
-    # Apply anch_ids to extract boxes, prob, classes
-    final_boxes, final_probs, final_cls_idx = boxes[anch_ids], probs[anch_ids], cls_idx[anch_ids]
-    # Limit the number of predictions
-    if len(final_probs)>TOP_N_DETECTIONS:
-        anch_ids = final_probs.argsort()[::-1][:TOP_N_DETECTIONS]
-        final_boxes, final_probs, final_cls_idx = final_boxes[anch_ids], final_probs[anch_ids], final_cls_idx[anch_ids]
-
-    return final_boxes, final_probs, final_cls_idx, anch_ids
+    return final_boxes, final_probs, final_cls_idx
 
 
 def dgb_viz(net, sess,  inputs):

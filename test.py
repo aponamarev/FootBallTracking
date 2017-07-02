@@ -83,13 +83,16 @@ def process(img, net, sess, threshold=0.5, max_obj=50):
 
         label = []
 
-        final_boxes, final_probs, final_cls_idx, anch_ids = \
-            filter_prediction(p.bboxes[i], p.conf[i], p.classes[i], PROB_THRESH=threshold, TOP_N_DETECTIONS=max_obj)
+        final_boxes, final_probs, final_cls_idx = \
+            filter_prediction(p.bboxes[i], p.conf[i], p.classes[i],
+                              PROB_THRESH=threshold, TOP_N_DETECTIONS=max_obj, n_classes=len(coco_labels))
         for box_id in range(len(final_boxes)):
             kernel_id = final_cls_idx[box_id]
             label.append(CLASSES[kernel_id] + " {}%".format(int(final_probs[box_id] * 100)))
 
-        img = draw_boxes(img, bbox_transform(np.hsplit(final_boxes,4)), label, thickness=1, fontScale=0.5)
+        img = draw_boxes(img,
+                         bbox_transform(np.hsplit(np.array(final_boxes),4)),
+                         label, thickness=1, fontScale=0.5)
 
     return img
 
