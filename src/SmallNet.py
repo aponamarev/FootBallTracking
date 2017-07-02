@@ -92,4 +92,4 @@ class Net(ObjectDetectionNet):
         c5 = upsampling(c4, 256, name="up5")
         c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
 
-        self.feature_map = separable_conv(c6, self.K * (self.n_classes + 4 + 1), name='feature_map')
+        self.feature_map = separable_conv(c6, self.K * (self.n_classes + 4 + 1), name='features')
