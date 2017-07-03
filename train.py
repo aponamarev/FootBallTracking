@@ -39,7 +39,7 @@ flags.DEFINE_float("width", 0.5, "Set the net width multiple. Default is 1.0. Ty
 print("Starting training process")
 print("Model restore/save folder", FLAGS.train_dir)
 print("Model restore status", FLAGS.restore)
-print("Model net", FLAGS.small)
+print("Model net", FLAGS.net)
 
 train_dir = FLAGS.train_dir
 learning_rate = FLAGS.learning_rate
