@@ -16,7 +16,7 @@ from .ObjectDetection import ObjectDetectionNet
 
 Point = namedtuple('Point',['x', 'y'])
 
-class Net(ObjectDetectionNet):
+class SmallNet(ObjectDetectionNet):
 
     def __init__(self, labels_provided, imshape, lr=1e-3, activations='elu', width=1.0):
 
@@ -32,8 +32,6 @@ class Net(ObjectDetectionNet):
 
 
     def _add_featuremap(self):
-
-
         separable_conv = self._separable_conv2d
         conv = self._conv2d
         deconv = self._deconv
@@ -41,43 +39,42 @@ class Net(ObjectDetectionNet):
         maxpool = self._max_pool
         bn = self._batch_norm
         fc = self._fullyconnected
+        drop_out = self._drop_out_conv
 
         def upsampling(input, filters, name):
-
             with variable_scope('upsampling_' + name):
+                input = separable_conv(input, filters, strides=2, name='upsampling')
                 with variable_scope('tower1'):
-                    t1 = separable_conv(input, filters, name='conv1')
-                    t1 = separable_conv(t1, filters, name='conv2')
-                    t1 = separable_conv(t1, filters, name='conv3')
-                    t1 = separable_conv(t1, filters, strides=2, name='conv4')
+                    t1 = separable_conv(input, int(filters * self.width), name='conv1')
+                    t1 = separable_conv(t1, int(filters * self.width), name='conv2')
+                    t1 = separable_conv(t1, int(filters * self.width), name='conv3')
+                    t1 = separable_conv(t1, int(filters * self.width), name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = separable_conv(input, filters, name='conv1')
-                    t2 = separable_conv(t2, filters, strides=2, name='conv2')
+                    t2 = separable_conv(input, int(filters * self.width), name='conv1')
+                    t2 = separable_conv(t2, int(filters * self.width), name='conv2')
 
                 with variable_scope('tower3'):
-                    t3 = separable_conv(input, filters, strides=2, name='regularization')
+                    t3 = separable_conv(input, int(filters * self.width), name='regularization')
 
                 c = concat([t1, t2, t3], axis=3, name='concat')
-                c = separable_conv(c, filters, name="output")
+                c = separable_conv(c, int(filters * self.width), name="output")
 
             return c
 
         def downsampling(input, filters, name):
-
             with variable_scope('downsampling_' + name):
-                d = deconv(input, filters, [3,3], [2,2], padding='SAME')
-                d = separable_conv(d, filters, name='output')
+                d = deconv(input, int(filters * self.width), [3, 3], [2, 2], padding='SAME')
+                d = separable_conv(d, int(filters * self.width), name='output')
 
             return d
 
         def lateral_connection(td, dt, filters, name):
-
-            with variable_scope('lateral_'+name):
+            with variable_scope('lateral_' + name):
                 dt = stop_gradient(dt, name="stop_G")
-                l = separable_conv(dt, filters, name="L")
+                l = separable_conv(dt, int(filters * self.width), name="L")
                 output = concat((td, l))
-                return separable_conv(output, filters, name="force_choice")
+                return separable_conv(output, int(filters * self.width), name="force_choice")
 
         inputs = self.input_img
 
@@ -91,5 +88,6 @@ class Net(ObjectDetectionNet):
         c4 = separable_conv(c3, 128, BN_FLAG=True, strides=2, name='conv4')
         c5 = upsampling(c4, 256, name="up5")
         c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
+        c6 = drop_out(c6, "d3_dropout")
 
-        self.feature_map = separable_conv(c6, self.K * (self.n_classes + 4 + 1), name='features')
+        self.feature_map = separable_conv(c6, self.K * (self.n_classes + 4 + 1), name='feature_map')

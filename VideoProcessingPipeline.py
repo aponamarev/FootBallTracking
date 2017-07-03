@@ -24,7 +24,7 @@ flags.DEFINE_string("save_to", "output_video.mp4", "Provide a relative path for 
 
 # TODO: Finetune the net on wider screen and higher resolution.
 flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
-flags.DEFINE_string("path_to_net", "logs/adv1/model.ckpt", "Provide a relative path to a folder containing model.ckpt...... Default value: logs/adv1/model.ckpt")
+flags.DEFINE_string("path_to_net", "logs/adv1", "Provide a relative path to a folder containing model.ckpt...... Default value: logs/adv1/model.ckpt")
 
 FLAGS = flags.FLAGS
 
@@ -62,20 +62,17 @@ def define_net():
 
         print("Setting up a net. It may take a couple of minutes.")
         net.setup_inputs(*inputs)
+        print("Restoring a model.")
+        saver = tf.train.Saver()
 
         # Initialize variables in the model and merge all summaries
-        initializer = tf.global_variables_initializer()
-
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
+
     print("Creating a session.")
     sess = tf.Session(config=config, graph=graph)
-    sess.run(initializer)
-    print("Restoring a model.")
-    restore_variables = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    saver = tf.train.Saver(restore_variables, reshape=True)
-    saver.restore(sess, path_to_net)
+    saver.restore(sess, tf.train.latest_checkpoint(path_to_net))
     print("Pipeline is ready for video processing.")
 
     return sess, net

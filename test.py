@@ -18,6 +18,7 @@ from matplotlib.pyplot import imshow
 
 
 path_to_net = 'logs/adv1/model.ckpt'
+path_to_graph = 'logs/adv1/'
 imshape = (320, 320)
 batch_size = 1
 
@@ -45,31 +46,24 @@ def main():
         deltas_ph = placeholder(dtype=tf.float32, shape=[batch_size,net.WHK, 4], name="deltas_gt")
         bbox_ph = placeholder(dtype=tf.float32, shape=[batch_size,net.WHK, 4], name="bbox_gt")
         # Grouped those placeholder for ease of handling
-        inputs = (im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
+        print("Building a net")
+        net.setup_inputs(im_ph, bbox_ph, deltas_ph, mask_ph, labels_ph)
+        saver = tf.train.Saver()
 
-        net.setup_inputs(*inputs)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.allow_soft_placement = True
 
-        # Initialize variables in the model and merge all summaries
-        initializer = tf.global_variables_initializer()
-
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        config.allow_soft_placement = True
-
-
+    # Initialize variables in the model and merge all summaries
     sess = tf.Session(config=config, graph=graph)
-    sess.run(initializer)
-
-    restore_variables = graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-    saver = tf.train.Saver(restore_variables, reshape=True)
-    saver.restore(sess, path_to_net)
+    print("Restoring variables.")
+    saver.restore(sess, tf.train.latest_checkpoint(path_to_graph))
+    print("The net is ready")
 
     for p in img_list:
         im = cvtColor(imread(check_path(p)), COLOR_BGR2RGB)
         im = process(im, net, sess, threshold=0.55, max_obj=50)
         imshow(im.astype(np.uint8))
-
-
 
 
 def process(img, net, sess, threshold=0.52, max_obj=50):

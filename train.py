@@ -15,7 +15,7 @@ from tqdm import trange
 from tensorflow import placeholder, RandomShuffleQueue
 from tensorflow.python.platform.app import flags
 from src.COCO_DB import COCO
-from src.SmallNet import Net
+from src.SmallNet import SmallNet
 from src.AdvancedNet import AdvancedNet
 
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle']
@@ -25,7 +25,7 @@ coco_labels=[1, 2, 3, 4]
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("train_dir", "logs/t1", "Provide training directory for recovering and storing model. Default value is logs/t6")
+flags.DEFINE_string("train_dir", "logs/small", "Provide training directory for recovering and storing model. Default value is logs/t6")
 flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. Default value is 1e-3")
 flags.DEFINE_bool("restore", True, "Do you want to restore a model? Default value is True.")
 flags.DEFINE_integer("batch_size", 128, "Provide a size of the minibatch. Default value is 128.")
@@ -33,14 +33,14 @@ flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image
 flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
-flags.DEFINE_string("net", "advanced", "Set a net. Default SmallNet. Options are [small, advanced]")
-flags.DEFINE_float("width", 1.0, "Set the net width multiple. Default is 1.0. Type Float")
+flags.DEFINE_string("net", "small", "Set a net. Default SmallNet. Options are [small, advanced]")
+flags.DEFINE_float("width", 0.5, "Set the net width multiple. Default is 1.0. Type Float")
 
 train_dir = FLAGS.train_dir
 learning_rate = FLAGS.learning_rate
 restore_model = FLAGS.restore
 batch_sz=FLAGS.batch_size
-imshape=(FLAGS.resolution, FLAGS.resolution)
+imshape=(FLAGS.resolution*2, FLAGS.resolution)
 
 queue_capacity = batch_sz * 5
 prefetching_threads = 4
@@ -50,7 +50,9 @@ summary_step = 100
 checkpoint_step = 1000
 max_steps = 10**6
 
-Net = {'small': Net, 'advanced': AdvancedNet}
+Net = {'small': SmallNet, 'advanced': AdvancedNet}
+assert FLAGS.net in Net.keys(), "Incorrect net key provided. Expected keys: {}. Provided key {}".\
+    format(list(Net.keys()), FLAGS.net)
 Net = Net[FLAGS.net]
 
 
@@ -103,12 +105,24 @@ def train():
                                         capacity=queue_capacity, shapes=shapes, name="Batch_{}_samples".format(batch_sz))
 
             net.optimization_op = FLAGS.optimizer
+            print("Building {}.".format(type(net).__name__))
             net.setup_inputs(*dequeue_op)
             net.debug = FLAGS.debug
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
-        saver = tf.train.Saver(g.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
+        restore_variable = tf.global_variables()
+
+        ##################
+        ### temp       ###
+        ##################
+
+        new_graph_vars = []
+        for v_i in restore_variable:
+            if not 'feature_map' in v_i.op.name:
+                new_graph_vars.append(v_i)
+
+        saver = tf.train.Saver(new_graph_vars, reshape=True)
 
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter(train_dir, g)
@@ -116,25 +130,26 @@ def train():
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
-
+        print("Creating a session.")
         sess = tf.Session(config=config, graph=g)
-        sess.run(initializer)
-
+        print("Initializing/restoring variables.")
+        if restore_model:
+            sess.run(initializer)
+            #saver = tf.train.Saver(sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES), reshape=True)
+            saver.restore(sess, join(train_dir, 'model.ckpt'))
+        else:
+            sess.run(initializer)
+    print("Start data prefetching")
     # Launch coordinator that will manage threads
     coord = tf.train.Coordinator()
     tf.train.start_queue_runners(sess=sess, coord=coord)
     threads = [threading.Thread(target=enqueue_thread, args=(coord, sess, net, enqueue_op, inputs)).start()
      for _ in range(prefetching_threads)]
 
-
-    if restore_model:
-        saver = tf.train.Saver(sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES), reshape=True)
-        saver.restore(sess, join(train_dir, 'model.ckpt'))
-
     pass_tracker_start = time.time()
     pass_tracker_prior = pass_tracker_start
     pbar = trange(max_steps)
-
+    print("Pipeline built is completed successfully.")
     prior_step = 0
     print("Beginning training process.")
 
