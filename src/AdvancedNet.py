@@ -46,30 +46,30 @@ class AdvancedNet(ObjectDetectionNet):
         def upsampling(input, filters, name):
 
             with variable_scope('upsampling_' + name):
-                input = separable_conv(input, filters, strides=2, name='upsampling')
+                input = separable_conv(input, filters, strides=2, BN_FLAG=False, name='upsampling')
                 with variable_scope('tower1'):
-                    t1 = separable_conv(input, int(filters*self.width), name='conv1')
-                    t1 = separable_conv(t1, int(filters*self.width), name='conv2')
-                    t1 = separable_conv(t1, int(filters*self.width), name='conv3')
-                    t1 = separable_conv(t1, int(filters*self.width), name='conv4')
+                    t1 = separable_conv(input, int(filters*self.width), BN_FLAG=False, name='conv1')
+                    t1 = separable_conv(t1, int(filters*self.width), BN_FLAG=False, name='conv2')
+                    t1 = separable_conv(t1, int(filters*self.width), BN_FLAG=False, name='conv3')
+                    t1 = separable_conv(t1, int(filters*self.width), BN_FLAG=False, name='conv4')
 
                 with variable_scope('tower2'):
-                    t2 = separable_conv(input, int(filters*self.width), name='conv1')
-                    t2 = separable_conv(t2, int(filters*self.width), name='conv2')
+                    t2 = separable_conv(input, int(filters*self.width), BN_FLAG=False, name='conv1')
+                    t2 = separable_conv(t2, int(filters*self.width), BN_FLAG=False, name='conv2')
 
                 with variable_scope('tower3'):
-                    t3 = separable_conv(input, int(filters*self.width), name='regularization')
+                    t3 = separable_conv(input, int(filters*self.width), BN_FLAG=False, name='regularization')
 
                 c = concat([t1, t2, t3], axis=3, name='concat')
-                c = separable_conv(c, int(filters*self.width), name="output")
+                c = separable_conv(c, int(filters*self.width), BN_FLAG=False, name="output")
 
             return c
 
         def downsampling(input, filters, name):
 
             with variable_scope('downsampling_' + name):
-                d = deconv(input, int(filters*self.width), [3,3], [2,2], padding='SAME')
-                d = separable_conv(d, int(filters*self.width), name='output')
+                d = deconv(input, int(filters*self.width), [3,3], [2,2], BN_FLAG=False, padding='SAME')
+                d = separable_conv(d, int(filters*self.width), BN_FLAG=False, name='output')
 
             return d
 
@@ -77,9 +77,9 @@ class AdvancedNet(ObjectDetectionNet):
 
             with variable_scope('lateral_'+name):
                 dt = stop_gradient(dt, name="stop_G")
-                l = separable_conv(dt, int(filters*self.width), name="L")
+                l = separable_conv(dt, int(filters*self.width), BN_FLAG=False, name="L")
                 output = concat((td, l))
-                return separable_conv(output, int(filters*self.width), name="force_choice")
+                return separable_conv(output, int(filters*self.width), BN_FLAG=False, name="force_choice")
 
         inputs = self.input_img
 
@@ -88,11 +88,11 @@ class AdvancedNet(ObjectDetectionNet):
             inputs = tf.subtract( tf.divide(inputs, 127.5), 1.0, name="img_norm")
 
         c1 = conv(inputs, 8, strides=2, BN_FLAG=False, name='conv1')
-        c2 = separable_conv(c1, 32, BN_FLAG=True, strides=2, name='conv2')
+        c2 = separable_conv(c1, 32, BN_FLAG=False, strides=2, name='conv2')
         c3 = upsampling(c2, 64, name="up3")
-        c4 = separable_conv(c3, 128, BN_FLAG=True, strides=2, name='conv4')
+        c4 = separable_conv(c3, 128, BN_FLAG=False, strides=2, name='conv4')
         c5 = upsampling(c4, 256, name="up5")
-        c6 = separable_conv(c5, 512, BN_FLAG=True, strides=2, name='conv6')
+        c6 = separable_conv(c5, 512, BN_FLAG=False, strides=2, name='conv6')
         d5 = downsampling(c6, 256, name="down5")
         d5 = lateral_connection(d5, c5, 256, name="l5")
         d4 = downsampling(d5, 128, name="down4")

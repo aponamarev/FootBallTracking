@@ -25,16 +25,16 @@ coco_labels=[1, 2, 3, 4]
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("train_dir", "logs/small", "Provide training directory for recovering and storing model. Default value is logs/t6")
-flags.DEFINE_float("learning_rate", 1e-3, "Provide a value for learning rate. Default value is 1e-3")
+flags.DEFINE_string("train_dir", "logs/adv1", "Provide training directory for recovering and storing model. Default value is logs/adv1")
+flags.DEFINE_float("learning_rate", 1e-4, "Provide a value for learning rate. Default value is 1e-4")
 flags.DEFINE_bool("restore", True, "Do you want to restore a model? Default value is True.")
 flags.DEFINE_integer("batch_size", 128, "Provide a size of the minibatch. Default value is 128.")
 flags.DEFINE_integer("resolution", 320, "Provide value for rescaling input image. Default value is 320 (320x320).")
 flags.DEFINE_bool("debug", False, "Set to True to enter into a debugging mode. Default value is False.")
 flags.DEFINE_string("activations", 'elu', "Set activations. Default type is elu. Available options are elu, relu")
 flags.DEFINE_string("optimizer", "adam", "Set optimization algorithm. Default value is adam. Available options are [adam, rmsprop, momentum].")
-flags.DEFINE_string("net", "small", "Set a net. Default SmallNet. Options are [small, advanced]")
-flags.DEFINE_float("width", 0.5, "Set the net width multiple. Default is 1.0. Type Float")
+flags.DEFINE_string("net", "advanced", "Set a net. Default SmallNet. Options are [small, advanced]")
+flags.DEFINE_float("width", 0.5, "Set the net width multiple. Default is 0.5. Type Float")
 
 print("Starting training process")
 print("Model restore/save folder", FLAGS.train_dir)
@@ -45,7 +45,7 @@ train_dir = FLAGS.train_dir
 learning_rate = FLAGS.learning_rate
 restore_model = FLAGS.restore
 batch_sz=FLAGS.batch_size
-imshape=(FLAGS.resolution*2, FLAGS.resolution)
+imshape=(FLAGS.resolution, FLAGS.resolution)
 
 queue_capacity = batch_sz * 5
 prefetching_threads = 4
