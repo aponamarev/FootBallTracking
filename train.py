@@ -111,18 +111,8 @@ def train():
 
         # Initialize variables in the model and merge all summaries
         initializer = tf.global_variables_initializer()
-        restore_variable = tf.global_variables()
-
-        ##################
-        ### temp       ###
-        ##################
-
-        new_graph_vars = []
-        for v_i in restore_variable:
-            if not 'feature_map' in v_i.op.name:
-                new_graph_vars.append(v_i)
-
-        saver = tf.train.Saver(new_graph_vars, reshape=True)
+        restore_variables = tf.global_variables()
+        saver = tf.train.Saver(restore_variables, reshape=True)
 
         summary_op = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter(train_dir, g)
@@ -134,8 +124,6 @@ def train():
         sess = tf.Session(config=config, graph=g)
         print("Initializing/restoring variables.")
         if restore_model:
-            sess.run(initializer)
-            #saver = tf.train.Saver(sess.graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES), reshape=True)
             saver.restore(sess, join(train_dir, 'model.ckpt'))
         else:
             sess.run(initializer)
